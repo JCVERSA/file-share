@@ -39,7 +39,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.0.2"
+APP_VERSION = "3.2.0"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 SESSION_COOKIE = "fs_session"
 SESSION_TTL = 12 * 60 * 60
@@ -437,7 +437,7 @@ class State:
 
 
 class ShareHandler(http.server.BaseHTTPRequestHandler):
-    server_version = "FileShare/3.0.2"
+    server_version = "FileShare/3.1.0"
 
     @property
     def state(self) -> State:
@@ -608,6 +608,17 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(303)
             self.send_header("Location", "/")
             self.send_header("Set-Cookie", f"{SESSION_COOKIE}=deleted; Max-Age=0{self.state.cookie_suffix()}")
+            self.end_headers()
+            return
+        if parsed.path == "/stop-share":
+            if not self.state.is_authenticated(self):
+                self.send_json({"error": "authentication required"}, status=401)
+                return
+            self.state.stop_reason = "stopped from dashboard"
+            self.state.stop_event.set()
+            self.send_response(204)
+            self.send_header("Cache-Control", "no-store, max-age=0")
+            self.send_security_headers()
             self.end_headers()
             return
         self.send_error(404, "Not found")
@@ -831,13 +842,38 @@ def dashboard_html(state: State) -> str:
     public_url_json = json.dumps(public_url or f"http://127.0.0.1:{state.config.port}/", ensure_ascii=True)
     return f"""
 <section class="dashboard" data-share-url={html.escape(public_url_json, quote=True)}>
-  <div class="hero">
-    <div>
+  <div class="hero fs-hero">
+    <div class="fs-hero-copy">
       <div class="eyebrow">{html.escape(mode)}</div>
-      <h1>Available files</h1>
+      <div class="fs-title-row">
+        <h1>Available files</h1>
+        <span class="fs-online"><span class="status-dot" aria-hidden="true"></span> ONLINE</span>
+      </div>
       <p class="muted">{file_count} file{'s' if file_count != 1 else ''} · {html.escape(str(state.config.root))}</p>
     </div>
-    <form method="post" action="/logout"><button class="ghost" type="submit">Lock</button></form>
+    <div class="fs-header-actions">
+      <form method="post" action="/logout"><button class="ghost fs-lock-btn" type="submit">Lock</button></form>
+      <button id="stopShare" class="button fs-stop-btn" type="button" aria-label="Stop sharing">
+        <span class="fs-stop-icon" aria-hidden="true">×</span>
+        <span>Stop share</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="fs-share-card">
+    <div class="fs-share-copy">
+      <div class="eyebrow">PUBLIC LINK</div>
+      <div class="fs-share-url" title="{public_display}">{public_display}</div>
+      <div class="fs-share-meta">
+        <span id="shareState">{html.escape(expiry_text)}</span>
+        <span aria-hidden="true">·</span>
+        <span id="statsText">0 downloads · 0 B transferred</span>
+      </div>
+    </div>
+    <div class="fs-share-actions">
+      <button id="copyLink" type="button" class="ghost fs-action-btn">Copy link</button>
+      <button id="showQr" type="button" class="ghost fs-action-btn">QR code</button>
+    </div>
   </div>
 
   <div class="toolbar">
@@ -854,16 +890,15 @@ def dashboard_html(state: State) -> str:
     </div>
   </div>
 
-  <div class="meta-strip">
-    <span><strong id="fileCount">{file_count}</strong> files</span>
-    <span id="shareState">{html.escape(expiry_text)}</span>
-    <span id="statsText">0 downloads · 0 B transferred</span>
-  </div>
-
-  <div class="actions">
-    <button id="downloadAll" type="button" class="primary">Download all</button>
-    <button id="copyLink" type="button" class="ghost">Copy link</button>
-    <button id="showQr" type="button" class="ghost">QR code</button>
+  <div class="fs-library-head">
+    <div>
+      <div class="eyebrow">FILES</div>
+      <div class="fs-library-title"><strong id="fileCount">{file_count}</strong> available</div>
+    </div>
+    <button id="downloadAll" type="button" class="animated-button fs-animated-button">
+      <span>Download all</span>
+      <span aria-hidden="true"></span>
+    </button>
   </div>
 
   <div id="qrPanel" class="qr-panel" hidden>
@@ -875,18 +910,63 @@ def dashboard_html(state: State) -> str:
     <canvas id="qrCanvas" width="220" height="220" aria-label="QR code for the share URL"></canvas>
   </div>
 
-  <div id="downloadProgress" class="progress-card" hidden>
+  <div id="downloadProgress" class="progress-card" hidden aria-live="polite">
     <div class="progress-head"><strong id="progressName">Downloading</strong><span id="progressValue">0%</span></div>
     <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
-    <button id="cancelDownload" class="ghost small" type="button">Cancel</button>
+    <div class="fs-transfer-status">
+      <div class="fs-transfer-copy"><strong id="progressStatus">Starting download…</strong><span id="progressMeta">Preparing transfer</span></div>
+      <div class="fs-transfer-actions">
+        <button id="transferAction" class="fs-transfer-btn is-active" type="button" disabled aria-live="polite">
+          <span class="fs-svg-wrapper" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v10m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          <span>Downloading</span>
+        </button>
+        <label class="fs-checkbox" id="downloadComplete" hidden>
+          <input id="downloadDone" type="checkbox" disabled>
+          <span class="checkmark">
+            <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+              <rect x="4" y="4" width="24" height="24" rx="6" stroke="currentColor" stroke-width="2"/>
+              <polyline points="9,17 14,22 23,11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Downloaded</span>
+          </span>
+        </label>
+        <button id="cancelDownload" class="ghost small" type="button">Cancel</button>
+      </div>
+    </div>
   </div>
 
-  <div id="fileList" class="file-list" aria-live="polite"></div>
+  <div id="fileLoading" class="fs-loading" aria-live="polite">
+    <div class="fs-stage-loading">
+      <div class="fs-3d-loader" aria-hidden="true">
+        <div class="ground"><div></div></div>
+        <div class="box box0"><div></div></div><div class="box box1"><div></div></div><div class="box box2"><div></div></div><div class="box box3"><div></div></div>
+        <div class="box box4"><div></div></div><div class="box box5"><div></div></div><div class="box box6"><div></div></div><div class="box box7"><div></div></div>
+      </div>
+    </div>
+    <div class="fs-loader" aria-hidden="true">
+      <p class="loader-text fs-loader-text">Loading files</p>
+      <span class="load fs-load"></span>
+    </div>
+  </div>
+
+  <div id="fileList" class="file-list" aria-live="polite">
+    <div class="file-skeleton" aria-hidden="true">
+      <div class="file-skeleton-icon"></div>
+      <div class="file-skeleton-main"><div class="file-skeleton-line wide"></div><div class="file-skeleton-line medium"></div></div>
+      <div class="file-skeleton-dot"></div>
+    </div>
+    <div class="file-skeleton" aria-hidden="true">
+      <div class="file-skeleton-icon"></div>
+      <div class="file-skeleton-main"><div class="file-skeleton-line wide"></div><div class="file-skeleton-line short"></div></div>
+      <div class="file-skeleton-dot"></div>
+    </div>
+    <div class="file-skeleton" aria-hidden="true">
+      <div class="file-skeleton-icon"></div>
+      <div class="file-skeleton-main"><div class="file-skeleton-line medium"></div><div class="file-skeleton-line short"></div></div>
+      <div class="file-skeleton-dot"></div>
+    </div>
+  </div>
   <div id="emptyState" class="empty" hidden>No matching files.</div>
-
-  <div class="share-link">
-    <span>{public_display}</span>
-  </div>
 </section>
 """
 
@@ -999,7 +1079,7 @@ def main() -> int:
             # its own DNS resolver cannot resolve trycloudflare.com. That is
             # not sufficient evidence to declare the tunnel broken, so DNS
             # failures are reported as UNVERIFIED and the share remains alive.
-            request = Request(state.public_url + "/", headers={"User-Agent": "file-share-verifier/3.0.1"})
+            request = Request(state.public_url + "/", headers={"User-Agent": "file-share-verifier/3.2.0"})
             try:
                 with urlopen(request, timeout=20) as response:
                     status = int(getattr(response, "status", response.getcode()))

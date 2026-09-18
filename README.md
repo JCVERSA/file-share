@@ -6,6 +6,7 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 
 - Python standard library for the backend.
 - Dark, minimal interface; no heavy visual effects or gradients.
+- Integrated animated download CTA, download-all action, restrained stop-share action, skeleton loading state, connection loader, and 3D GitHub footer link.
 - Random password generated on every launch and printed in the terminal.
 - Automatic share expiration (default: 30 minutes).
 - Optional `--one-time` mode: the whole share stops after the first completed file or bundle download.
@@ -17,6 +18,8 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - `Download all` creates a temporary ZIP and streams it to the client.
 - Client-side search and category filters.
 - Copy-link button.
+- GitHub project button linking to `https://github.com/JCVERSA/file-share`.
+- Dashboard stop-share control with confirmation; stopping the share does not delete the source files.
 - QR code generated in the browser; the password is never embedded in it.
 - Live expiry and transfer statistics.
 - Optional download progress for files up to 50 MiB; larger files use the browser's native streaming download path.
@@ -26,6 +29,21 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - If `cloudflared` is missing, the app downloads the official release binary to a temporary directory and verifies its SHA-256 digest before execution.
 - No system package installation is required for the application or for the Cloudflare fallback binary.
 - Temporary state is removed when the share stops.
+
+## Quick start
+
+Clone the official repository and enter the project directory:
+
+```bash
+git clone https://github.com/JCVERSA/file-share.git
+cd file-share
+```
+
+Then start a share:
+
+```bash
+python3 server.py /root/swiftslate-secrets
+```
 
 ## Usage
 
@@ -77,7 +95,7 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 
 ```text
 ================================================================
-  TEMPORARY FILE SHARE v3.0.2
+  TEMPORARY FILE SHARE v3.1.0
 ================================================================
   Directory : /root/swiftslate-secrets
   Local     : http://127.0.0.1:43821/
@@ -126,9 +144,14 @@ Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become in
 
 ## Validation status
 
-The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS and is reported by the runtime only after the public URL passes an HTTP health check.
+The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
 
 
-## v3.0.2
+## v3.1.0
 
 Public Cloudflare URL verification is best-effort. If the VPS/container cannot resolve `trycloudflare.com`, the share stays online and the CLI reports `UNVERIFIED` instead of stopping the tunnel.
+
+
+## Dashboard UI
+
+The dashboard includes scoped motion components for download progress and completion, a compact 3D loading/archive scene, skeleton loading, stop-share feedback, and the project GitHub action. Motion is automatically reduced when the browser requests `prefers-reduced-motion`.
