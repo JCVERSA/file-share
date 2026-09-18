@@ -77,7 +77,7 @@ The terminal prints the password and the public URL when the Cloudflare Quick Tu
 
 ```text
 ================================================================
-  TEMPORARY FILE SHARE v3.0.0
+  TEMPORARY FILE SHARE v3.0.1
 ================================================================
   Directory : /root/swiftslate-secrets
   Local     : http://127.0.0.1:43821/
@@ -127,3 +127,8 @@ Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become in
 ## Validation status
 
 The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS and is reported by the runtime only after the public URL passes an HTTP health check.
+
+
+## v3.0.1
+
+Public Cloudflare URL verification is best-effort. If the VPS/container cannot resolve `trycloudflare.com`, the share stays online and the CLI reports `UNVERIFIED` instead of stopping the tunnel.

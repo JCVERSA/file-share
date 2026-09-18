@@ -39,7 +39,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.0.1"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 SESSION_COOKIE = "fs_session"
 SESSION_TTL = 12 * 60 * 60
@@ -437,7 +437,7 @@ class State:
 
 
 class ShareHandler(http.server.BaseHTTPRequestHandler):
-    server_version = "FileShare/3.0"
+    server_version = "FileShare/3.0.1"
 
     @property
     def state(self) -> State:
@@ -994,13 +994,24 @@ def main() -> int:
                 fail("The public tunnel could not be established.")
             print(f"[OK] Public URL: {state.public_url}/")
 
-            # Verify the actual public endpoint before declaring READY.
-            request = Request(state.public_url + "/", headers={"User-Agent": "file-share-verifier/3.0"})
-            with urlopen(request, timeout=20) as response:
-                status = int(getattr(response, "status", response.getcode()))
-                if status != 200:
-                    fail(f"Public health check returned HTTP {status}.")
-            print("[OK] Public HTTP health check passed.")
+            # Best-effort verification of the public endpoint.
+            # A VPS/container may have working cloudflared connectivity while
+            # its own DNS resolver cannot resolve trycloudflare.com. That is
+            # not sufficient evidence to declare the tunnel broken, so DNS
+            # failures are reported as UNVERIFIED and the share remains alive.
+            request = Request(state.public_url + "/", headers={"User-Agent": "file-share-verifier/3.0.1"})
+            try:
+                with urlopen(request, timeout=20) as response:
+                    status = int(getattr(response, "status", response.getcode()))
+                    if status != 200:
+                        print(f"[WARN] Public HTTP verification returned HTTP {status}; external access remains UNVERIFIED.")
+                    else:
+                        print("[OK] Public HTTP health check passed.")
+            except HTTPError as exc:
+                print(f"[WARN] Public HTTP verification returned HTTP {exc.code}; external access remains UNVERIFIED.")
+            except URLError as exc:
+                print(f"[WARN] Public endpoint could not be verified from this container: {exc}")
+                print("[INFO] The Cloudflare tunnel is still running; test the URL from another device/network if needed.")
 
         print("\n" + "=" * 72)
         print(f"  TEMPORARY FILE SHARE v{APP_VERSION}")
