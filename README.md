@@ -1,5 +1,6 @@
 # File Share
 
+
 Lightweight temporary file-sharing server for Linux VPS/container environments.
 
 ## What it does
@@ -33,61 +34,112 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 
 ## Quick start
 
-Clone the official repository and enter the project directory:
+### Linux
+
+Install or update File Share:
 
 ```bash
-git clone https://github.com/JCVERSA/file-share.git
-cd file-share
+curl -fsSL "https://raw.githubusercontent.com/JCVERSA/file-share/main/install.sh" | sh
 ```
 
-Then start a share:
+Then simply run:
 
 ```bash
-python3 server.py /root/swiftslate-secrets
+fs
 ```
 
-## Usage
+With no directory argument, File Share shares the **current working directory**.
 
-Default: 30-minute public share.
+Share a specific directory:
 
 ```bash
-python3 server.py /root/swiftslate-secrets
+fs /root/swiftslate-secrets
 ```
 
-Custom lifetime:
+Update:
 
 ```bash
-python3 server.py /root/swiftslate-secrets --expires 1h
+fs update
 ```
 
-One-time share:
+Check the installed version:
 
 ```bash
-python3 server.py /root/swiftslate-secrets --one-time
+fs --version
 ```
 
-One-time + custom lifetime:
+Uninstall:
 
 ```bash
-python3 server.py /root/swiftslate-secrets --expires 15m --one-time
+fs uninstall
 ```
 
-No automatic expiry:
+### Windows PowerShell
 
-```bash
-python3 server.py /root/swiftslate-secrets --no-expiry
+Install or update File Share:
+
+```powershell
+irm https://raw.githubusercontent.com/JCVERSA/file-share/main/install.ps1 | iex
 ```
 
-Fixed local port:
+After installation, reopen PowerShell if `fs` is not immediately available:
 
-```bash
-python3 server.py /root/swiftslate-secrets --port 8080
+```powershell
+fs
 ```
 
-Local-only mode without Cloudflare:
+With no directory argument, it shares the **current working directory**.
+
+Share a specific directory:
+
+```powershell
+fs "C:\Users\user\Documents\swiftslate-secrets"
+```
+
+Update:
+
+```powershell
+fs update
+```
+
+Check the installed version:
+
+```powershell
+fs --version
+```
+
+Uninstall:
+
+```powershell
+fs uninstall
+```
+
+> If you prefer not to pipe an installer from the network, download `install.sh` or `install.ps1` from the repository, inspect it, and run it locally.
+
+## Direct Python usage
+
+The project can still be run without the global `fs` command:
 
 ```bash
-python3 server.py /root/swiftslate-secrets --no-tunnel
+python3 server.py
+```
+
+or on Windows:
+
+```powershell
+python .\server.py . --no-tunnel
+```
+
+The directory argument remains optional; omitting it means the current working directory.
+
+### Common options
+
+```bash
+fs --no-tunnel
+fs --expires 1h
+fs --no-expiry
+fs --one-time
+fs /path/to/folder --expires 15m --one-time
 ```
 
 ## Terminal output
@@ -96,7 +148,7 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 
 ```text
 ================================================================
-  TEMPORARY FILE SHARE v3.3.0
+  TEMPORARY FILE SHARE v3.5.0
 ================================================================
   Directory : /root/swiftslate-secrets
   Local     : http://127.0.0.1:43821/
@@ -152,7 +204,7 @@ Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become in
 The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
 
 
-## v3.3.0
+## v3.5.0
 
 Public Cloudflare URL verification is best-effort. If the VPS/container cannot resolve `trycloudflare.com`, the share stays online and the CLI reports `UNVERIFIED` instead of stopping the tunnel.
 

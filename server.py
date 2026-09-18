@@ -7,6 +7,7 @@ Examples:
     python3 server.py /root/one-file --one-time
     python3 server.py /root/files --expires 30m --one-time --port 8080
     python3 server.py /root/files --no-tunnel
+    python3 server.py                         # share the current working directory
 
 The application uses only Python's standard library. A Cloudflare Quick
 Tunnel is started automatically unless --no-tunnel is supplied.
@@ -39,7 +40,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.3.0"
+APP_VERSION = "3.5.0"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 SESSION_COOKIE = "fs_session"
 SESSION_TTL = 12 * 60 * 60
@@ -981,7 +982,8 @@ def dashboard_html(state: State) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Authenticated temporary file sharing with optional Cloudflare Quick Tunnel.")
-    parser.add_argument("directory", help="Directory whose immediate regular files should be shared")
+    parser.add_argument("--version", action="version", version=f"FileShare {APP_VERSION}")
+    parser.add_argument("directory", nargs="?", default=".", help="Directory to share (default: current working directory)")
     parser.add_argument("--host", default="127.0.0.1", help="Bind address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=0, help="Port; 0 means auto-select")
     parser.add_argument("--no-tunnel", action="store_true", help="Run only the local web server")
