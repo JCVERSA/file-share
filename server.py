@@ -39,7 +39,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.0.1"
+APP_VERSION = "3.0.2"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 SESSION_COOKIE = "fs_session"
 SESSION_TTL = 12 * 60 * 60
@@ -437,7 +437,7 @@ class State:
 
 
 class ShareHandler(http.server.BaseHTTPRequestHandler):
-    server_version = "FileShare/3.0.1"
+    server_version = "FileShare/3.0.2"
 
     @property
     def state(self) -> State:

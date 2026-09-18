@@ -145,9 +145,12 @@
       if (response.status === 401) { window.location.href = '/'; return; }
       const status = await response.json();
       state.files = status.file_count ? await (async () => {
-        // File metadata is intentionally returned in the page-independent endpoint.
+        // /api/files returns an object: { files: [...] }.
+        // Normalize it here so rendering always receives an array.
         const r = await fetch('/api/files', {cache: 'no-store'});
-        return r.ok ? r.json() : [];
+        if (!r.ok) return [];
+        const payload = await r.json();
+        return Array.isArray(payload.files) ? payload.files : [];
       })() : [];
       renderFiles();
       updateStats(status);
