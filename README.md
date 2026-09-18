@@ -1,39 +1,37 @@
 # File Share
 
+<<<<<<< HEAD
 
 Lightweight temporary file-sharing server for Linux VPS/container environments.
+=======
+A lightweight temporary file-sharing server for Linux VPSs and containers.
+>>>>>>> a14a7ad4164ccab2a9bc65b610b749ada86cd0a4
 
-## What it does
+File Share starts a local Python HTTP server for a selected directory, protects access with a generated password, and can expose the service through a temporary Cloudflare Quick Tunnel.
 
-- Python standard library for the backend.
-- Dark, minimal interface; no heavy visual effects or gradients.
-- Integrated animated download CTA, download-all action, restrained stop-share action, refresh control, skeleton loading state, connection loader, and 3D GitHub footer link.
-- Random password generated on every launch and printed in the terminal.
-- Automatic share expiration (default: 30 minutes).
-- Optional `--one-time` mode: the whole share stops after the first completed file or bundle download.
-- Login rate limiting: 5 attempts per client per minute.
-- Immediate regular files only; no recursive browsing.
-- Symlinks are excluded.
-- File-path validation and `O_NOFOLLOW` where available.
-- Streaming downloads with range support for large files.
-- `Download all` creates a temporary ZIP and streams it to the client.
-- Client-side search and category filters.
-- Copy-link button.
-- GitHub project button linking to `https://github.com/JCVERSA/file-share`.
-- Dashboard stop-share control with confirmation; stopping the share does not delete the source files.
-- QR code generated in the browser; the password is never embedded in it.
-- Live expiry and transfer statistics.
-- Manual file refresh button with a spinning refresh icon and skeleton placeholders while the directory is being rescanned.
-- Optional download progress for files up to 50 MiB; larger files use the browser's native streaming download path.
-- Local server listens on `127.0.0.1` by default.
-- Cloudflare Quick Tunnel is started automatically unless `--no-tunnel` is used.
-- Existing `~/.cloudflared` configuration is never modified; Quick Tunnel uses an isolated temporary `HOME`.
-- If `cloudflared` is missing, the app downloads the official release binary to a temporary directory and verifies its SHA-256 digest before execution.
-- No system package installation is required for the application or for the Cloudflare fallback binary.
-- Temporary state is removed when the share stops.
+## Features
 
-## Quick start
+- Simple Python backend using the standard library
+- Clean dark web interface
+- Random password generated for every share session
+- Automatic expiration
+- Optional one-time sharing
+- Search and file-type filters
+- File name, type, size, and date information
+- Direct downloads
+- Download all files as a ZIP
+- HTTP Range support for large files and resumable downloads
+- Download counters and transfer statistics
+- QR code view
+- Copy public URL
+- Brute-force protection
+- Path-traversal protection
+- Symlink restrictions
+- Local HTTP server bound to `127.0.0.1`
+- Cloudflare Quick Tunnel support
+- Automatic cleanup when the share stops
 
+<<<<<<< HEAD
 ### Linux
 
 Install or update File Share:
@@ -43,19 +41,62 @@ curl -fsSL "https://raw.githubusercontent.com/JCVERSA/file-share/main/install.sh
 ```
 
 Then simply run:
+=======
+> This project is designed for temporary sharing. Do not expose sensitive files unless you understand the risks of sharing them through a public link.
+
+---
+
+## Quick Start
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/JCVERSA/file-share.git
+cd file-shareil
+```
+
+### 2. Start a share
+
+Choose the directory you want to share:
+>>>>>>> a14a7ad4164ccab2a9bc65b610b749ada86cd0a4
 
 ```bash
 fs
 ```
 
+<<<<<<< HEAD
 With no directory argument, File Share shares the **current working directory**.
 
 Share a specific directory:
+=======
+The server will generate a temporary password and start the share session.
+
+The terminal will display the local status, Cloudflare public URL, password, and session information.
+
+### 3. Open the public link
+
+Open the generated `https://*.trycloudflare.com/` URL from another device.
+
+The password shown in the server logs is required to access the files.
+
+---
+
+## Command Usage
+
+### Basic
+
+```bash
+python3 server.py /path/to/directory
+```
+
+Example:
+>>>>>>> a14a7ad4164ccab2a9bc65b610b749ada86cd0a4
 
 ```bash
 fs /root/swiftslate-secrets
 ```
 
+<<<<<<< HEAD
 Update:
 
 ```bash
@@ -75,6 +116,24 @@ fs uninstall
 ```
 
 ### Windows PowerShell
+=======
+### Custom expiration
+
+```bash
+python3 server.py /root/swiftslate-secrets --expires 15m
+```
+
+Examples:
+
+```bash
+--expires 5m
+--expires 30m
+--expires 1h
+--expires 2d
+```
+
+### Disable expiration
+>>>>>>> a14a7ad4164ccab2a9bc65b610b749ada86cd0a4
 
 Install or update File Share:
 
@@ -82,6 +141,7 @@ Install or update File Share:
 irm https://raw.githubusercontent.com/JCVERSA/file-share/main/install.ps1 | iex
 ```
 
+<<<<<<< HEAD
 After installation, reopen PowerShell if `fs` is not immediately available:
 
 ```powershell
@@ -140,13 +200,115 @@ fs --expires 1h
 fs --no-expiry
 fs --one-time
 fs /path/to/folder --expires 15m --one-time
+=======
+Use this only when you intentionally want the session to remain active until it is stopped.
+
+### One-time sharing
+
+```bash
+python3 server.py /root/swiftslate-secrets --one-time
 ```
 
-## Terminal output
+The share is automatically stopped after the configured one-time transfer completes.
 
-The terminal prints the password and public URL when the Cloudflare Quick Tunnel has been created. Public URL verification is best-effort; a DNS failure inside the VPS/container does not stop an otherwise running tunnel.
+---
+
+## Interface
+
+The web interface provides:
+
+- File search
+- Type filters
+- Download buttons
+- Download-all action
+- Public URL copy button
+- QR code
+- Expiration countdown
+- Download statistics
+- Transfer statistics
+- Active download information
+
+---
+
+## Security
+
+File Share is designed to reduce accidental exposure of unrelated files.
+
+The server:
+
+- Serves only the selected directory
+- Refuses path traversal
+- Refuses symbolic links
+- Uses a generated password for each session
+- Applies rate limiting to failed authentication attempts
+- Keeps the local HTTP service on `127.0.0.1`
+- Uses a temporary Cloudflare environment
+- Removes temporary runtime data when the session ends
+
+However, a Cloudflare Quick Tunnel creates a public URL. Anyone who has both the public URL and the current password can access the shared files while the session is active.
+
+Do not use temporary public sharing as a replacement for a dedicated private file-storage system.
+
+---
+
+## Windows
+
+File Share can also be used locally on Windows.
+
+### Requirements
+
+Install Python 3 and make sure `python` or `py` works in PowerShell:
+
+```powershell
+python --version
+>>>>>>> a14a7ad4164ccab2a9bc65b610b749ada86cd0a4
+```
+
+or:
+
+```powershell
+py --version
+```
+
+### Clone the repository
+
+Open PowerShell:
+
+```powershell
+git clone https://github.com/JCVERSA/file-share.git
+cd file-share
+```
+
+### Share a Windows directory
+
+The `directory` argument is required.
+
+To share the current directory:
+
+```powershell
+python .\server.py . --no-tunnel
+```
+
+With the Python launcher:
+
+```powershell
+py .\server.py . --no-tunnel
+```
+
+To share another directory, use its full path:
+
+```powershell
+python .\server.py "C:\Users\user\Documents\swiftslate-secrets" --no-tunnel
+```
+
+Use quotes when the path contains spaces.
+
+### Example from the project folder
+
+If PowerShell shows:
 
 ```text
+<<<<<<< HEAD
 ================================================================
   TEMPORARY FILE SHARE v3.5.0
 ================================================================
@@ -161,54 +323,188 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 ================================================================
   STATUS: READY
 ================================================================
+=======
+PS C:\Users\user\Documents\file-share\file-share>
+>>>>>>> a14a7ad4164ccab2a9bc65b610b749ada86cd0a4
 ```
 
-## Security model
+this is valid:
 
-The Python origin binds to loopback by default. Only the selected directory's immediate regular files are exposed. The application does not browse subdirectories and ignores symbolic links.
+```powershell
+python .\server.py . --no-tunnel
+```
 
-The browser session uses an HTTP-only SameSite cookie. When the public URL exists, the cookie is also marked Secure.
+This is **not** valid because the required directory argument is missing:
 
-The QR code contains only the public URL, never the password.
+```powershell
+python .\server.py --no-tunnel
+```
 
-The password and public URL are separate secrets. Anyone who has both can use the share while it is active.
+### Windows + Cloudflare Quick Tunnel
 
-Share a dedicated directory rather than a broad system directory. The application refuses to share `/` itself.
+To use the public Cloudflare link, omit `--no-tunnel`:
 
-## Cloudflare Quick Tunnel
+```powershell
+python .\server.py "C:\Users\user\Documents\swiftslate-secrets"
+```
 
-Quick Tunnels generate a random `trycloudflare.com` hostname and proxy the local origin through Cloudflare. Cloudflare documents Quick Tunnels as a testing/development feature and currently limits them to 200 in-flight requests; they do not provide an SLA.
+The application will display the generated public URL and password in the terminal when the tunnel is available.
 
-The application uses an isolated temporary Cloudflare configuration directory, so an existing user `~/.cloudflared/config.yaml` is not changed.
+For a local-only Windows test, use:
 
-## QR code
+```powershell
+--no-tunnel
+```
 
-The interface uses the `qrcode` browser build from jsDelivr at version 1.5.4. The library runs in the browser; the QR payload is the already-visible public URL and is not sent to a QR-generation API.
+The local server will be available at the address displayed in the terminal, typically using `127.0.0.1` and an automatically selected port.
 
-If the browser cannot load the CDN asset, the file-sharing functionality still works; only the QR display is unavailable.
+### Useful Windows commands
 
-## Large files
+Check the current directory:
 
-The backend streams files in 1 MiB chunks and supports byte ranges for resumable browser downloads. The optional progress UI uses an in-browser buffered request only for files up to 50 MiB to avoid forcing very large files into browser memory. Larger files use the normal browser download path.
+```powershell
+Get-Location
+```
 
-## Refreshing the file list
+List files:
 
-The **Refresh** button re-reads the shared directory without restarting the server or changing the public URL. While the request is in progress, the file list is replaced by lightweight skeleton rows and the refresh icon spins. If the refresh fails, the previous list is restored.
+```powershell
+Get-ChildItem
+```
 
-## Stop sharing
+Move to the project:
 
-Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become invalid, and temporary tunnel/bundle files are removed.
+```powershell
+cd "C:\Users\user\Documents\file-share\file-share"
+```
 
-## Validation status
+Stop the share:
 
-The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
+```text
+Ctrl+C
+```
 
+## Requirements
 
+<<<<<<< HEAD
 ## v3.5.0
+=======
+The project is designed to run on common Linux VPSs and containers.
+>>>>>>> a14a7ad4164ccab2a9bc65b610b749ada86cd0a4
 
-Public Cloudflare URL verification is best-effort. If the VPS/container cannot resolve `trycloudflare.com`, the share stays online and the CLI reports `UNVERIFIED` instead of stopping the tunnel.
+Required:
 
+- Python 3
+- A Linux environment
+- Internet access for the Cloudflare tunnel
+- `cloudflared`
 
-## Dashboard UI
+The project can install or use `cloudflared` according to its runtime setup.
 
-The dashboard includes scoped motion components for download progress and completion, a compact 3D loading/archive scene, skeleton loading, stop-share feedback, and the project GitHub action. Motion is automatically reduced when the browser requests `prefers-reduced-motion`.
+---
+
+## Project Structure
+
+```text
+file-share/
+├── server.py
+├── templates/
+│   └── index.html
+└── README.md
+```
+
+---
+
+## How It Works
+
+```text
+Selected directory
+        │
+        ▼
+Python HTTP server
+127.0.0.1
+        │
+        ▼
+Cloudflare Quick Tunnel
+        │
+        ▼
+Public HTTPS URL
+        │
+        ▼
+Browser on another device
+```
+
+The local server remains bound to localhost while Cloudflare provides the temporary public endpoint.
+
+---
+
+## Stopping a Share
+
+Press:
+
+```text
+Ctrl+C
+```
+
+The server stops the temporary services and removes its temporary runtime data.
+
+The original shared directory is not intentionally modified by the sharing process.
+
+---
+
+## Troubleshooting
+
+### The public URL is displayed but cannot be verified locally
+
+This can happen when the VPS/container has DNS restrictions or cannot resolve the public `trycloudflare.com` hostname.
+
+The tunnel URL may still be usable from another device.
+
+Check that:
+
+```bash
+cloudflared --version
+```
+
+works and that the local server is healthy.
+
+### Port problems
+
+The server uses a free local port automatically unless configured otherwise by the current implementation.
+
+### Python check
+
+```bash
+python3 --version
+```
+
+---
+
+## Important Notes
+
+Cloudflare Quick Tunnels are intended for temporary/testing use.
+
+For long-term production file hosting, use a dedicated private storage or file-serving architecture instead of keeping a Quick Tunnel permanently active.
+
+---
+
+## License
+
+See the repository license file for the current licensing terms.
+
+---
+
+## Repository
+
+Official repository:
+
+```text
+https://github.com/JCVERSA/file-share
+```
+
+Clone:
+
+```bash
+git clone https://github.com/JCVERSA/file-share.git
+cd file-shareil
+```
