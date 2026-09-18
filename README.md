@@ -6,7 +6,7 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 
 - Python standard library for the backend.
 - Dark, minimal interface; no heavy visual effects or gradients.
-- Integrated animated download CTA, download-all action, restrained stop-share action, skeleton loading state, connection loader, and 3D GitHub footer link.
+- Integrated animated download CTA, download-all action, restrained stop-share action, refresh control, skeleton loading state, connection loader, and 3D GitHub footer link.
 - Random password generated on every launch and printed in the terminal.
 - Automatic share expiration (default: 30 minutes).
 - Optional `--one-time` mode: the whole share stops after the first completed file or bundle download.
@@ -22,6 +22,7 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - Dashboard stop-share control with confirmation; stopping the share does not delete the source files.
 - QR code generated in the browser; the password is never embedded in it.
 - Live expiry and transfer statistics.
+- Manual file refresh button with a spinning refresh icon and skeleton placeholders while the directory is being rescanned.
 - Optional download progress for files up to 50 MiB; larger files use the browser's native streaming download path.
 - Local server listens on `127.0.0.1` by default.
 - Cloudflare Quick Tunnel is started automatically unless `--no-tunnel` is used.
@@ -29,7 +30,6 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - If `cloudflared` is missing, the app downloads the official release binary to a temporary directory and verifies its SHA-256 digest before execution.
 - No system package installation is required for the application or for the Cloudflare fallback binary.
 - Temporary state is removed when the share stops.
-<<<<<<< HEAD
 
 ## Quick start
 
@@ -46,12 +46,6 @@ Then start a share:
 python3 server.py /root/swiftslate-secrets
 ```
 
-=======
-```
-git clone https://github.com/JCVERSA/file-share.git
-cd file-share
-```
->>>>>>> 8fdb880ecb1e18dcf12cfb725e0547f704e5f767
 ## Usage
 
 Default: 30-minute public share.
@@ -102,7 +96,7 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 
 ```text
 ================================================================
-  TEMPORARY FILE SHARE v3.1.0
+  TEMPORARY FILE SHARE v3.3.0
 ================================================================
   Directory : /root/swiftslate-secrets
   Local     : http://127.0.0.1:43821/
@@ -145,6 +139,10 @@ If the browser cannot load the CDN asset, the file-sharing functionality still w
 
 The backend streams files in 1 MiB chunks and supports byte ranges for resumable browser downloads. The optional progress UI uses an in-browser buffered request only for files up to 50 MiB to avoid forcing very large files into browser memory. Larger files use the normal browser download path.
 
+## Refreshing the file list
+
+The **Refresh** button re-reads the shared directory without restarting the server or changing the public URL. While the request is in progress, the file list is replaced by lightweight skeleton rows and the refresh icon spins. If the refresh fails, the previous list is restored.
+
 ## Stop sharing
 
 Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become invalid, and temporary tunnel/bundle files are removed.
@@ -154,7 +152,7 @@ Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become in
 The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
 
 
-## v3.1.0
+## v3.3.0
 
 Public Cloudflare URL verification is best-effort. If the VPS/container cannot resolve `trycloudflare.com`, the share stays online and the CLI reports `UNVERIFIED` instead of stopping the tunnel.
 

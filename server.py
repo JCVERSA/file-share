@@ -39,7 +39,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.2.0"
+APP_VERSION = "3.3.0"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 SESSION_COOKIE = "fs_session"
 SESSION_TTL = 12 * 60 * 60
@@ -437,7 +437,7 @@ class State:
 
 
 class ShareHandler(http.server.BaseHTTPRequestHandler):
-    server_version = "FileShare/3.1.0"
+    server_version = f"FileShare/{APP_VERSION}"
 
     @property
     def state(self) -> State:
@@ -895,10 +895,18 @@ def dashboard_html(state: State) -> str:
       <div class="eyebrow">FILES</div>
       <div class="fs-library-title"><strong id="fileCount">{file_count}</strong> available</div>
     </div>
-    <button id="downloadAll" type="button" class="animated-button fs-animated-button">
-      <span>Download all</span>
-      <span aria-hidden="true"></span>
-    </button>
+    <div class="fs-library-actions">
+      <button id="refreshFiles" type="button" class="fs-refresh-btn" aria-label="Refresh files">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M20 11a8 8 0 0 0-14.9-3M4 5v4h4M4 13a8 8 0 0 0 14.9 3M20 19v-4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Refresh</span>
+      </button>
+      <button id="downloadAll" type="button" class="animated-button fs-animated-button">
+        <span>Download all</span>
+        <span aria-hidden="true"></span>
+      </button>
+    </div>
   </div>
 
   <div id="qrPanel" class="qr-panel" hidden>
@@ -944,7 +952,7 @@ def dashboard_html(state: State) -> str:
       </div>
     </div>
     <div class="fs-loader" aria-hidden="true">
-      <p class="loader-text fs-loader-text">Loading files</p>
+      <p id="fileLoadingText" class="loader-text fs-loader-text">Loading files</p>
       <span class="load fs-load"></span>
     </div>
   </div>
@@ -1079,7 +1087,7 @@ def main() -> int:
             # its own DNS resolver cannot resolve trycloudflare.com. That is
             # not sufficient evidence to declare the tunnel broken, so DNS
             # failures are reported as UNVERIFIED and the share remains alive.
-            request = Request(state.public_url + "/", headers={"User-Agent": "file-share-verifier/3.2.0"})
+            request = Request(state.public_url + "/", headers={"User-Agent": f"file-share-verifier/{APP_VERSION}"})
             try:
                 with urlopen(request, timeout=20) as response:
                     status = int(getattr(response, "status", response.getcode()))
