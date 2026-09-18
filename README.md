@@ -28,7 +28,7 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - Temporary state is removed when the share stops.
 Git clone
 ```
-git clone https://github.com/JCVERSA/file-share
+git clone https://github.com/JCVERSA/file-share && cd file-share
 ```
 ## Usage
 
