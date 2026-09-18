@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>{{TITLE}}</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0d10;
+      --panel: #111419;
+      --panel-2: #151920;
+      --border: #252a33;
+      --text: #f4f5f7;
+      --muted: #9ba3af;
+      --soft: #c8cdd5;
+      --accent: #e7e9ed;
+      --success: #7fd6a3;
+    }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+    a { color: inherit; text-decoration: none; }
+    .page { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 42px; }
+    .shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
+    .topbar { height: 58px; padding: 0 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 13px; }
+    .brand { color: var(--text); font-weight: 650; letter-spacing: .02em; }
+    .content { padding: 30px; }
+    .eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+    h1 { margin: 0; font-size: clamp(30px, 6vw, 46px); line-height: 1.05; letter-spacing: -.04em; }
+    .muted { color: var(--muted); }
+    .hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+    .hero .muted { margin: 10px 0 0; font-size: 14px; word-break: break-word; }
+    .notice { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); background: #0e1115; border-radius: 12px; margin-bottom: 18px; color: var(--muted); font-size: 13px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--success); flex: 0 0 auto; }
+    .file-list { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+    .file-row { display: grid; grid-template-columns: 46px 1fr auto; gap: 14px; align-items: center; padding: 15px 16px; background: var(--panel-2); border-bottom: 1px solid var(--border); transition: background .12s ease; }
+    .file-row:last-child { border-bottom: 0; }
+    .file-row:hover { background: #191e26; }
+    .file-icon { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); display: grid; place-items: center; color: var(--soft); font-size: 9px; font-weight: 800; letter-spacing: .04em; overflow: hidden; }
+    .file-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+    .file-main strong { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
+    .file-main span { color: var(--muted); font-size: 12px; }
+    .download { color: var(--text); font-size: 13px; font-weight: 650; white-space: nowrap; }
+    .auth-card { width: min(460px, 100%); margin: 50px auto; }
+    .auth-card h1 { font-size: 36px; }
+    .auth-form { margin-top: 24px; display: grid; gap: 9px; }
+    label { font-size: 13px; color: var(--soft); }
+    input { width: 100%; padding: 13px 14px; border: 1px solid var(--border); border-radius: 11px; background: #0d1014; color: var(--text); outline: none; font: inherit; }
+    input:focus { border-color: #4a515d; }
+    button { border: 0; border-radius: 10px; padding: 12px 16px; font: inherit; font-weight: 700; cursor: pointer; background: var(--accent); color: #111317; }
+    button.ghost { background: transparent; color: var(--soft); border: 1px solid var(--border); }
+    .auth-form button { margin-top: 7px; }
+    .empty { padding: 30px; border: 1px dashed var(--border); border-radius: 14px; color: var(--muted); text-align: center; }
+    .back { display: inline-block; margin-top: 18px; font-size: 13px; color: var(--soft); }
+    footer { text-align: center; color: #6f7783; font-size: 11px; padding: 16px 0 0; }
+    @media (max-width: 620px) {
+      .page { width: min(100% - 20px, 920px); padding-top: 20px; }
+      .content { padding: 20px; }
+      .hero { align-items: flex-start; }
+      .file-row { grid-template-columns: 40px 1fr; }
+      .download { grid-column: 2; justify-self: start; margin-top: 2px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="shell">
+      <header class="topbar">
+        <span class="brand">File Share</span>
+        <span>v{{VERSION}}</span>
+      </header>
+      <div class="content">{{CONTENT}}</div>
+    </section>
+    <footer>Temporary access · keep the URL and password private</footer>
+  </main>
+</body>
+</html>
