@@ -8,15 +8,18 @@
   <style>
     :root {
       color-scheme: dark;
-      --bg: #0b0d10;
-      --panel: #111419;
-      --panel-2: #151920;
-      --border: #252a33;
-      --text: #f4f5f7;
-      --muted: #9ba3af;
-      --soft: #c8cdd5;
-      --accent: #e7e9ed;
-      --success: #7fd6a3;
+      --bg: #08090b;
+      --panel: #101216;
+      --panel2: #14171c;
+      --panel3: #0d0f13;
+      --border: #242831;
+      --border-strong: #303640;
+      --text: #f2f3f5;
+      --muted: #8f97a4;
+      --soft: #cbd0d8;
+      --success: #8bd5ab;
+      --danger: #ee9494;
+      --shadow: 0 16px 60px rgba(0,0,0,.28);
     }
     * { box-sizing: border-box; }
     html, body { min-height: 100%; }
@@ -28,45 +31,74 @@
       line-height: 1.45;
     }
     a { color: inherit; text-decoration: none; }
-    .page { width: min(920px, calc(100% - 32px)); margin: 0 auto; padding: 56px 0 42px; }
-    .shell { background: var(--panel); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
-    .topbar { height: 58px; padding: 0 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 13px; }
-    .brand { color: var(--text); font-weight: 650; letter-spacing: .02em; }
-    .content { padding: 30px; }
-    .eyebrow { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
-    h1 { margin: 0; font-size: clamp(30px, 6vw, 46px); line-height: 1.05; letter-spacing: -.04em; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .page { width: min(1040px, calc(100% - 24px)); margin: 0 auto; padding: 24px 0 34px; }
+    .shell { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); }
+    .topbar { min-height: 56px; padding: 0 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .brand { color: var(--text); font-weight: 700; letter-spacing: .025em; }
+    .content { padding: 26px; }
+    .eyebrow { font-size: 10px; letter-spacing: .15em; text-transform: uppercase; color: var(--muted); font-weight: 800; margin-bottom: 9px; }
+    h1 { margin: 0; font-size: clamp(30px, 5vw, 44px); line-height: 1.03; letter-spacing: -.045em; }
+    h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
     .muted { color: var(--muted); }
-    .hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
-    .hero .muted { margin: 10px 0 0; font-size: 14px; word-break: break-word; }
-    .notice { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); background: #0e1115; border-radius: 12px; margin-bottom: 18px; color: var(--muted); font-size: 13px; }
-    .status-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--success); flex: 0 0 auto; }
+    .hero { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+    .hero .muted { margin: 9px 0 0; font-size: 13px; overflow-wrap: anywhere; }
+    .toolbar { display: grid; gap: 10px; padding: 14px; background: var(--panel3); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 12px; }
+    .search-wrap input { width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: 10px; background: #090b0e; color: var(--text); outline: none; }
+    .search-wrap input:focus { border-color: var(--border-strong); }
+    .filter-group { display: flex; flex-wrap: wrap; gap: 7px; }
+    .filter, .ghost, .primary { border-radius: 9px; padding: 9px 12px; border: 1px solid var(--border); font-weight: 700; font-size: 12px; transition: background .12s ease, border-color .12s ease, color .12s ease; }
+    .filter { background: transparent; color: var(--muted); }
+    .filter:hover, .ghost:hover { background: #191d23; border-color: var(--border-strong); color: var(--text); }
+    .filter.active { background: #e8e9eb; border-color: #e8e9eb; color: #0f1114; }
+    .primary { background: #e8e9eb; border-color: #e8e9eb; color: #0f1114; }
+    .primary:hover { background: #fff; }
+    .ghost { background: transparent; color: var(--soft); }
+    .small { padding: 7px 10px; }
+    .meta-strip { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 12px; margin: 8px 1px 15px; }
+    .meta-strip strong { color: var(--soft); }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
     .file-list { border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
-    .file-row { display: grid; grid-template-columns: 46px 1fr auto; gap: 14px; align-items: center; padding: 15px 16px; background: var(--panel-2); border-bottom: 1px solid var(--border); transition: background .12s ease; }
+    .file-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 13px; align-items: center; padding: 14px; background: var(--panel2); border-bottom: 1px solid var(--border); }
     .file-row:last-child { border-bottom: 0; }
-    .file-row:hover { background: #191e26; }
-    .file-icon { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--border); display: grid; place-items: center; color: var(--soft); font-size: 9px; font-weight: 800; letter-spacing: .04em; overflow: hidden; }
-    .file-main { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-    .file-main strong { font-size: 14px; font-weight: 650; overflow-wrap: anywhere; }
-    .file-main span { color: var(--muted); font-size: 12px; }
-    .download { color: var(--text); font-size: 13px; font-weight: 650; white-space: nowrap; }
-    .auth-card { width: min(460px, 100%); margin: 50px auto; }
-    .auth-card h1 { font-size: 36px; }
-    .auth-form { margin-top: 24px; display: grid; gap: 9px; }
-    label { font-size: 13px; color: var(--soft); }
-    input { width: 100%; padding: 13px 14px; border: 1px solid var(--border); border-radius: 11px; background: #0d1014; color: var(--text); outline: none; font: inherit; }
-    input:focus { border-color: #4a515d; }
-    button { border: 0; border-radius: 10px; padding: 12px 16px; font: inherit; font-weight: 700; cursor: pointer; background: var(--accent); color: #111317; }
-    button.ghost { background: transparent; color: var(--soft); border: 1px solid var(--border); }
-    .auth-form button { margin-top: 7px; }
+    .file-row:hover { background: #171a20; }
+    .file-icon { width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--border); display: grid; place-items: center; color: var(--soft); font-size: 9px; font-weight: 800; letter-spacing: .04em; overflow: hidden; }
+    .file-main { min-width: 0; }
+    .file-main strong { display: block; font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+    .file-main span { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+    .download { color: var(--soft); font-size: 12px; font-weight: 750; white-space: nowrap; }
+    .download::after { content: " ↓"; color: var(--muted); }
     .empty { padding: 30px; border: 1px dashed var(--border); border-radius: 14px; color: var(--muted); text-align: center; }
-    .back { display: inline-block; margin-top: 18px; font-size: 13px; color: var(--soft); }
-    footer { text-align: center; color: #6f7783; font-size: 11px; padding: 16px 0 0; }
-    @media (max-width: 620px) {
-      .page { width: min(100% - 20px, 920px); padding-top: 20px; }
-      .content { padding: 20px; }
+    .share-link { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--border); background: var(--panel3); color: var(--muted); font: 11px ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; border-radius: 10px; }
+    .notice { display: flex; align-items: center; gap: 9px; padding: 11px 12px; border: 1px solid var(--border); background: var(--panel3); border-radius: 11px; margin-bottom: 15px; color: var(--muted); font-size: 12px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--success); flex: 0 0 auto; }
+    .progress-card { margin: 14px 0; padding: 14px; border: 1px solid var(--border); background: var(--panel3); border-radius: 12px; }
+    .progress-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; margin-bottom: 8px; }
+    .progress-track { height: 7px; background: #20242b; border-radius: 999px; overflow: hidden; }
+    .progress-bar { height: 100%; width: 0; background: #dfe1e5; transition: width .12s linear; }
+    .progress-card .small { margin-top: 10px; }
+    .qr-panel { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: center; padding: 16px; margin-bottom: 16px; border: 1px solid var(--border); background: var(--panel3); border-radius: 14px; }
+    #qrCanvas { width: min(220px, 45vw); height: auto; background: #fff; padding: 8px; border-radius: 8px; justify-self: end; }
+    .auth-card { width: min(450px, 100%); margin: 52px auto; }
+    .auth-card p { margin: 10px 0 0; font-size: 13px; }
+    .auth-form { margin-top: 23px; display: grid; gap: 9px; }
+    label { font-size: 12px; color: var(--soft); }
+    .auth-form input { width: 100%; padding: 13px 14px; border: 1px solid var(--border); border-radius: 11px; background: #090b0e; color: var(--text); outline: none; }
+    .auth-form input:focus { border-color: var(--border-strong); }
+    .auth-form button { margin-top: 7px; padding: 12px 15px; border: 0; border-radius: 10px; background: #e8e9eb; color: #101215; font-weight: 800; }
+    .back { display: inline-block; margin-top: 17px; color: var(--soft); font-size: 12px; }
+    footer { text-align: center; color: #666e79; font-size: 10px; padding: 13px 0 0; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    [hidden] { display: none !important; }
+    @media (max-width: 680px) {
+      .page { width: min(100% - 12px, 1040px); padding-top: 8px; }
+      .content { padding: 18px; }
       .hero { align-items: flex-start; }
-      .file-row { grid-template-columns: 40px 1fr; }
-      .download { grid-column: 2; justify-self: start; margin-top: 2px; }
+      .file-row { grid-template-columns: 40px minmax(0, 1fr); }
+      .download { grid-column: 2; justify-self: start; margin-top: 1px; }
+      .qr-panel { grid-template-columns: 1fr; }
+      #qrCanvas { justify-self: start; }
     }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
   </style>
@@ -82,5 +114,196 @@
     </section>
     <footer>Temporary access · keep the URL and password private</footer>
   </main>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js" nonce="{{NONCE}}"></script>
+  <script nonce="{{NONCE}}">
+  (() => {
+    const app = {{APP_DATA}};
+    const dashboard = document.querySelector('.dashboard');
+    if (!dashboard) return;
+
+    const state = {
+      filter: 'all',
+      query: '',
+      files: [],
+      xhr: null,
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const fileList = $('fileList');
+    const emptyState = $('emptyState');
+    const search = $('search');
+    const progressCard = $('downloadProgress');
+    const progressName = $('progressName');
+    const progressValue = $('progressValue');
+    const progressBar = $('progressBar');
+
+    const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const categoryName = (category) => ({archives:'ZIP', images:'Images', documents:'Docs', other:'Other'}[category] || category);
+
+    const loadFiles = async () => {
+      const response = await fetch('/api/status', {cache: 'no-store'});
+      if (response.status === 401) { window.location.href = '/'; return; }
+      const status = await response.json();
+      state.files = status.file_count ? await (async () => {
+        // File metadata is intentionally returned in the page-independent endpoint.
+        const r = await fetch('/api/files', {cache: 'no-store'});
+        return r.ok ? r.json() : [];
+      })() : [];
+      renderFiles();
+      updateStats(status);
+    };
+
+    const renderFiles = () => {
+      const q = state.query.trim().toLowerCase();
+      const visible = state.files.filter((file) => {
+        const categoryOk = state.filter === 'all' || file.category === state.filter;
+        const queryOk = !q || file.name.toLowerCase().includes(q) || file.type.toLowerCase().includes(q);
+        return categoryOk && queryOk;
+      });
+
+      fileList.innerHTML = visible.map((file) => {
+        const icon = escapeHtml((file.type || 'FILE').slice(0,4).toUpperCase());
+        return `<a class="file-row" href="/download/${encodeURIComponent(file.name)}" data-download="${escapeHtml(file.name)}" data-size="${file.size}" download>
+          <span class="file-icon">${icon}</span>
+          <span class="file-main"><strong>${escapeHtml(file.name)}</strong><span>${escapeHtml(file.type)} · ${escapeHtml(file.size_human)} · ${escapeHtml(file.mtime)}</span></span>
+          <span class="download">Download</span>
+        </a>`;
+      }).join('');
+      emptyState.hidden = visible.length !== 0;
+      $('fileCount').textContent = String(visible.length);
+
+      document.querySelectorAll('[data-download]').forEach((link) => {
+        link.addEventListener('click', handleDownloadClick);
+      });
+    };
+
+    const updateStats = (status) => {
+      const bytes = status.bytes_total_human || '0 B';
+      $('statsText').textContent = `${status.downloads_total || 0} downloads · ${bytes} transferred${status.active_downloads ? ` · ${status.active_downloads} active` : ''}`;
+      const remaining = status.remaining;
+      if (remaining === null || typeof remaining === 'undefined') {
+        $('shareState').textContent = status.one_time ? 'Closes after first completed download' : 'No automatic expiry';
+      } else {
+        $('shareState').textContent = formatRemaining(remaining);
+      }
+    };
+
+    const formatRemaining = (seconds) => {
+      seconds = Math.max(0, Number(seconds) || 0);
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      if (h) return `Expires in ${h}h ${m}m`;
+      if (m) return `Expires in ${m}m ${String(s).padStart(2,'0')}s`;
+      return `Expires in ${s}s`;
+    };
+
+    const updateStatus = async () => {
+      try {
+        const response = await fetch('/api/status', {cache:'no-store'});
+        if (!response.ok) return;
+        const status = await response.json();
+        updateStats(status);
+        if (status.remaining === 0) window.setTimeout(() => window.location.reload(), 600);
+      } catch (_) {}
+    };
+
+    const setProgress = (loaded, total) => {
+      const percent = total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0;
+      progressValue.textContent = `${percent}%`;
+      progressBar.style.width = `${percent}%`;
+    };
+
+    const resetProgress = () => {
+      if (state.xhr) state.xhr.abort();
+      state.xhr = null;
+      progressCard.hidden = true;
+      progressBar.style.width = '0%';
+    };
+
+    const handleDownloadClick = (event) => {
+      const link = event.currentTarget;
+      const size = Number(link.dataset.size || 0);
+      if (!Number.isFinite(size) || size <= 0 || size > app.progress_limit) return;
+      event.preventDefault();
+      const name = link.dataset.download;
+      const href = link.getAttribute('href');
+      progressName.textContent = name;
+      setProgress(0, size);
+      progressCard.hidden = false;
+
+      const xhr = new XMLHttpRequest();
+      state.xhr = xhr;
+      xhr.open('GET', href, true);
+      xhr.responseType = 'blob';
+      xhr.onprogress = (e) => setProgress(e.loaded, e.total || size);
+      xhr.onload = () => {
+        if (xhr.status !== 200 && xhr.status !== 206) {
+          resetProgress();
+          return;
+        }
+        const disposition = xhr.getResponseHeader('Content-Disposition') || '';
+        const filenameMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        const finalName = filenameMatch ? decodeURIComponent(filenameMatch[1]) : name;
+        const url = URL.createObjectURL(xhr.response);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = finalName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        setProgress(size, size);
+        window.setTimeout(resetProgress, 700);
+        window.setTimeout(updateStatus, 800);
+      };
+      xhr.onerror = resetProgress;
+      xhr.onabort = () => { state.xhr = null; };
+      xhr.send();
+    };
+
+    search.addEventListener('input', () => { state.query = search.value; renderFiles(); });
+    document.querySelectorAll('[data-filter]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelectorAll('[data-filter]').forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        state.filter = button.dataset.filter;
+        renderFiles();
+      });
+    });
+
+    $('cancelDownload').addEventListener('click', resetProgress);
+    $('downloadAll').addEventListener('click', () => { window.location.href = '/download-all'; });
+    $('copyLink').addEventListener('click', async (event) => {
+      const url = app.public_url || window.location.origin + '/';
+      try {
+        await navigator.clipboard.writeText(url);
+        event.currentTarget.textContent = 'Copied';
+        window.setTimeout(() => event.currentTarget.textContent = 'Copy link', 1200);
+      } catch (_) {
+        window.prompt('Copy this link', url);
+      }
+    });
+    $('showQr').addEventListener('click', async () => {
+      const panel = $('qrPanel');
+      panel.hidden = !panel.hidden;
+      if (panel.hidden) return;
+      const canvas = $('qrCanvas');
+      const url = app.public_url || window.location.origin + '/';
+      if (window.QRCode && typeof window.QRCode.toCanvas === 'function') {
+        try {
+          await window.QRCode.toCanvas(canvas, url, {errorCorrectionLevel:'M', margin:1, width:220, color:{dark:'#111317', light:'#ffffff'}});
+        } catch (_) {
+          canvas.replaceWith(Object.assign(document.createElement('div'), {textContent:'QR unavailable'}));
+        }
+      } else {
+        canvas.replaceWith(Object.assign(document.createElement('div'), {textContent:'QR library unavailable'}));
+      }
+    });
+
+    loadFiles().catch(() => {});
+    window.setInterval(updateStatus, 5000);
+  })();
+  </script>
 </body>
 </html>
