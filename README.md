@@ -26,7 +26,10 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - If `cloudflared` is missing, the app downloads the official release binary to a temporary directory and verifies its SHA-256 digest before execution.
 - No system package installation is required for the application or for the Cloudflare fallback binary.
 - Temporary state is removed when the share stops.
-
+```
+git clone https://github.com/JCVERSA/file-share.git
+cd file-share
+```
 ## Usage
 
 Default: 30-minute public share.
