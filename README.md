@@ -29,6 +29,7 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - If `cloudflared` is missing, the app downloads the official release binary to a temporary directory and verifies its SHA-256 digest before execution.
 - No system package installation is required for the application or for the Cloudflare fallback binary.
 - Temporary state is removed when the share stops.
+<<<<<<< HEAD
 
 ## Quick start
 
@@ -45,6 +46,12 @@ Then start a share:
 python3 server.py /root/swiftslate-secrets
 ```
 
+=======
+```
+git clone https://github.com/JCVERSA/file-share.git
+cd file-share
+```
+>>>>>>> 8fdb880ecb1e18dcf12cfb725e0547f704e5f767
 ## Usage
 
 Default: 30-minute public share.
