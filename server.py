@@ -40,7 +40,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.5.0"
+APP_VERSION = "3.5.1"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 SESSION_COOKIE = "fs_session"
 SESSION_TTL = 12 * 60 * 60

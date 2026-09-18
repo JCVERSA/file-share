@@ -122,10 +122,16 @@ try {
     $updatePs1 = Join-Path $InstallDir 'update.ps1'
     $uninstallPs1 = Join-Path $InstallDir 'uninstall.ps1'
 
+    # PowerShell prefers .ps1 scripts over .cmd files when resolving a command.
+    # Remove any legacy fs.ps1 launcher so `fs` resolves to fs.cmd instead of
+    # trying to execute server.py through Windows file associations (for example VS Code).
+    Remove-Item -LiteralPath $fsPs1 -Force -ErrorAction SilentlyContinue
+
     @"
 @echo off
 setlocal
 set "FILE_SHARE_HOME=$InstallDir"
+
 if /I "%~1"=="update" goto UPDATE
 if /I "%~1"=="self-update" goto UPDATE
 if /I "%~1"=="uninstall" goto UNINSTALL
@@ -135,41 +141,46 @@ if /I "%~1"=="-V" goto VERSION
 if /I "%~1"=="help" goto HELP
 if /I "%~1"=="--help" goto HELP
 if /I "%~1"=="-h" goto HELP
+
 where py >nul 2>nul
-if not errorlevel 1 goto RUNPY
-python "%FILE_SHARE_HOME%\server.py" %*
+if not errorlevel 1 (
+    py "%FILE_SHARE_HOME%\server.py" %*
+) else (
+    where python >nul 2>nul
+    if errorlevel 1 (
+        echo [ERROR] Python 3 was not found in PATH.
+        exit /b 1
+    )
+    python "%FILE_SHARE_HOME%\server.py" %*
+)
 exit /b %ERRORLEVEL%
-:RUNPY
-py "%FILE_SHARE_HOME%\server.py" %*
-exit /b %ERRORLEVEL%
+
 :VERSION
 where py >nul 2>nul
-if not errorlevel 1 goto VERSION_PY
-python "%FILE_SHARE_HOME%\server.py" --version
+if not errorlevel 1 (
+    py "%FILE_SHARE_HOME%\server.py" --version
+) else (
+    python "%FILE_SHARE_HOME%\server.py" --version
+)
 exit /b %ERRORLEVEL%
-:VERSION_PY
-py "%FILE_SHARE_HOME%\server.py" --version
-exit /b %ERRORLEVEL%
+
 :HELP
 where py >nul 2>nul
-if not errorlevel 1 goto HELP_PY
-python "%FILE_SHARE_HOME%\server.py" --help
+if not errorlevel 1 (
+    py "%FILE_SHARE_HOME%\server.py" --help
+) else (
+    python "%FILE_SHARE_HOME%\server.py" --help
+)
 exit /b %ERRORLEVEL%
-:HELP_PY
-py "%FILE_SHARE_HOME%\server.py" --help
-exit /b %ERRORLEVEL%
+
 :UPDATE
 powershell -NoProfile -ExecutionPolicy Bypass -File "%FILE_SHARE_HOME%\update.ps1"
 exit /b %ERRORLEVEL%
+
 :UNINSTALL
 powershell -NoProfile -ExecutionPolicy Bypass -File "%FILE_SHARE_HOME%\uninstall.ps1"
 exit /b %ERRORLEVEL%
 "@ | Set-Content -LiteralPath $fsCmd -Encoding ASCII
-
-    @"
-param([Parameter(ValueFromRemainingArguments=`$true)][object[]]`$Args)
-& (Join-Path '$InstallDir' 'server.py') @Args
-"@ | Set-Content -LiteralPath $fsPs1 -Encoding UTF8
 
     @"
 Set-StrictMode -Version Latest
