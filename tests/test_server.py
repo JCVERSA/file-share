@@ -408,6 +408,22 @@ class FileShareTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertIn(b"QR Code Generator", response.read()[:1000])
 
+    def test_orphaned_upload_temps_are_swept(self) -> None:
+        old = self.root / f"{app.UPLOAD_TEMP_PREFIX}crashed.tmp"
+        old.write_bytes(b"partial data from a crashed run")
+        old_time = time.time() - 7200
+        os.utime(old, (old_time, old_time))
+        fresh = self.root / f"{app.UPLOAD_TEMP_PREFIX}active.tmp"
+        fresh.write_bytes(b"belongs to an in-flight upload")
+
+        removed = app.cleanup_orphaned_uploads(self.share.state)
+
+        self.assertIn(old.name, removed)
+        self.assertNotIn(fresh.name, removed)
+        self.assertFalse(old.exists())
+        self.assertTrue(fresh.exists())
+        self.assertTrue((self.root / "sample.txt").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

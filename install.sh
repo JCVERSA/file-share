@@ -65,10 +65,6 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 command_exists python3 || die "Python 3 is required. Install Python 3, then run the installer again."
 command_exists curl || die "curl is required. Install curl, then run the installer again."
 
-if ! command_exists unzip; then
-    :
-fi
-
 TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/file-share-install.XXXXXX")"
 cleanup() { rm -rf "$TMP_ROOT"; }
 trap cleanup EXIT INT TERM

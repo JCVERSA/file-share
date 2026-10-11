@@ -59,6 +59,10 @@ MAX_BUNDLE_SIZE = 2 * 1024 * 1024 * 1024
 DISK_SPACE_RESERVE = 16 * 1024 * 1024
 UPLOAD_IDLE_TIMEOUT = 60
 UPLOAD_TEMP_PREFIX = ".fileshare-upload-"
+# Startup sweep only removes upload temp files older than this. A live upload
+# writes (refreshing mtime) at least once per idle-timeout window, so a fresh
+# file may belong to an in-flight upload.
+ORPHAN_TEMP_MAX_AGE = 3600
 CLOUDFLARE_API = "https://api.github.com/repos/cloudflare/cloudflared/releases/latest"
 CLOUDFLARE_USER_AGENT = f"file-share/{APP_VERSION}"
 
@@ -211,6 +215,44 @@ def iter_regular_files(root: Path, root_fd: int | None = None) -> list[dict[str,
     return result
 
 
+def cleanup_orphaned_uploads(state: State) -> list[str]:
+    """Remove upload temp files left behind when a previous run crashed.
+
+    Only files older than ORPHAN_TEMP_MAX_AGE are touched, so an in-flight
+    upload from a concurrent run is left alone.
+    """
+    removed: list[str] = []
+    try:
+        if state.root_fd is not None:
+            with os.scandir(state.root_fd) as iterator:
+                entries = list(iterator)
+        else:
+            entries = list(os.scandir(state.config.root))
+    except OSError:
+        return removed
+    prefix = UPLOAD_TEMP_PREFIX.casefold()
+    now = time.time()
+    for entry in entries:
+        if not entry.name.casefold().startswith(prefix):
+            continue
+        try:
+            if entry.is_symlink() or not entry.is_file(follow_symlinks=False):
+                continue
+            if now - entry.stat(follow_symlinks=False).st_mtime <= ORPHAN_TEMP_MAX_AGE:
+                continue
+        except OSError:
+            continue
+        try:
+            if state.root_fd is not None:
+                os.unlink(entry.name, dir_fd=state.root_fd)
+            else:
+                Path(entry.path).unlink()
+            removed.append(entry.name)
+        except OSError:
+            pass
+    return removed
+
+
 def render_template(template: str, content: str, *, title: str, nonce: str, app_data: dict[str, object]) -> bytes:
     safe_data = json.dumps(app_data, ensure_ascii=True, separators=(",", ":"))
     safe_data = safe_data.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
@@ -236,12 +278,6 @@ def load_template() -> str:
     if any(item not in template for item in required):
         fail("Template is missing one or more required placeholders.")
     return template
-
-
-def http_download(url: str, *, headers: dict[str, str] | None = None, timeout: int = 30) -> bytes:
-    request = Request(url, headers=headers or {})
-    with urlopen(request, timeout=timeout) as response:
-        return response.read()
 
 
 def download_stream(url: str, destination: Path, *, headers: dict[str, str] | None = None, timeout: int = 60) -> str:
@@ -362,7 +398,6 @@ class State:
         self.root_identity: tuple[int, int] | None = None
         self.disk_work_semaphore = threading.BoundedSemaphore(1)
         self.server: http.server.ThreadingHTTPServer | None = None
-        self.http_thread: threading.Thread | None = None
         self.tunnel: subprocess.Popen[str] | None = None
         self.tunnel_home: Path | None = None
         self.tunnel_log: Path | None = None
@@ -1043,13 +1078,6 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
         ascii_name = clean.encode("ascii", "replace").decode("ascii").replace('"', "") or "download"
         return f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(clean, safe="")}'
 
-    def open_target(self, target: Path):
-        flags = os.O_RDONLY
-        if hasattr(os, "O_NOFOLLOW"):
-            flags |= os.O_NOFOLLOW
-        fd = os.open(target, flags)
-        return os.fdopen(fd, "rb", buffering=1024 * 1024)
-
     def open_shared_file(self, name: str):
         if safe_filename(name) is None or name.casefold().startswith(UPLOAD_TEMP_PREFIX.casefold()) or not self.state.root_path_is_same():
             return None
@@ -1503,6 +1531,9 @@ def main() -> int:
             state.open_root()
         except OSError as exc:
             fail(f"Unable to pin the shared directory: {exc}")
+        removed = cleanup_orphaned_uploads(state)
+        if removed:
+            print(f"[INFO] Removed {len(removed)} orphaned upload temp file(s) from a previous interrupted run.")
         if not is_loopback_host(args.host):
             print("[WARN] This server uses plain HTTP on a non-loopback interface, even when a Cloudflare tunnel is enabled; credentials and file traffic are not encrypted on that interface.")
         load_template()
@@ -1519,13 +1550,11 @@ def main() -> int:
 
         server = http.server.ThreadingHTTPServer((config.host, config.port), ShareHandler)
         server.daemon_threads = True
-        server.allow_reuse_address = True
         server.share_state = state  # type: ignore[attr-defined]
         state.server = server
         config.port = int(server.server_address[1])
         local_origin = format_http_origin(origin_host_for_bind(args.host), config.port)
         thread = threading.Thread(target=server.serve_forever, name="http-server", daemon=True)
-        state.http_thread = thread
         thread.start()
         print(f"[OK] Local server: {local_origin}/")
 
