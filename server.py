@@ -989,7 +989,7 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
         allowed, retry_after = self.state.allow_login_attempt(client)
         if not allowed:
             self.render_page(
-                '<section class="auth-card"><div class="eyebrow">RATE LIMITED</div><h1>Too many attempts</h1><p class="muted">Try again in about one minute.</p></section>',
+                '<section class="auth-card"><div class="eyebrow">Try again later</div><h1>Too many attempts</h1><p class="muted">Try again in about one minute.</p></section>',
                 status=429,
                 title="Rate limited · File Share",
                 extra_headers={"Retry-After": str(retry_after)},
@@ -1006,7 +1006,7 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
         data = self.rfile.read(length).decode("utf-8", "replace")
         password = parse_qs(data, keep_blank_values=True).get("password", [""])[0]
         if not hmac.compare_digest(password.encode("utf-8"), self.state.password.encode("utf-8")):
-            self.render_page('<section class="auth-card"><div class="eyebrow">DENIED</div><h1>Access denied</h1><p class="muted">The password is incorrect.</p><a class="back" href="/">Try again</a></section>', status=401, title="Access denied · File Share")
+            self.render_page('<section class="auth-card"><div class="eyebrow">Password not accepted</div><h1>Access denied</h1><p class="muted">The password is incorrect.</p><a class="back" href="/">Try again</a></section>', status=401, title="Access denied · File Share")
             return
 
         self.state.login_success(client)
@@ -1241,12 +1241,12 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
 def login_html() -> str:
     return """
 <section class="auth-card">
-  <div class="eyebrow">TEMPORARY SHARE</div>
+  <div class="eyebrow">Temporary share</div>
   <h1>Private file access</h1>
   <p class="muted">Enter the temporary password shown in the server logs.</p>
   <form method="post" action="/login" class="auth-form">
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
     <button type="submit">Unlock files</button>
   </form>
 </section>
@@ -1260,7 +1260,14 @@ def dashboard_html(state: State) -> str:
     remaining = state.remaining_seconds()
     file_count = len(state.files())
     mode = "One-time download" if state.config.one_time else "Temporary access"
-    expiry_text = "No expiry" if remaining is None else f"Expires in {remaining}s"
+    if remaining is None:
+        expiry_text = "Closes after first completed download" if state.config.one_time else "No automatic expiry"
+    elif remaining >= 3600:
+        expiry_text = f"Expires in {remaining // 3600}h {(remaining % 3600) // 60}m"
+    elif remaining >= 60:
+        expiry_text = f"Expires in {remaining // 60}m {remaining % 60:02d}s"
+    else:
+        expiry_text = f"Expires in {remaining}s"
     public_url_json = json.dumps(public_url or local_url, ensure_ascii=True)
     return f"""
 <section class="dashboard" data-share-url={html.escape(public_url_json, quote=True)}>
@@ -1269,9 +1276,9 @@ def dashboard_html(state: State) -> str:
       <div class="eyebrow">{html.escape(mode)}</div>
       <div class="fs-title-row">
         <h1>Available files</h1>
-        <span class="fs-online"><span class="status-dot" aria-hidden="true"></span> ONLINE</span>
+        <span class="fs-online"><span class="status-dot" aria-hidden="true"></span> Share active</span>
       </div>
-      <p class="muted">{file_count} file{'s' if file_count != 1 else ''} · {html.escape(str(state.config.root))}</p>
+      <p class="muted">{file_count} file{'s' if file_count != 1 else ''} in {html.escape(str(state.config.root))}</p>
     </div>
     <div class="fs-header-actions">
       <form method="post" action="/logout"><button class="ghost fs-lock-btn" type="submit">Lock</button></form>
@@ -1284,18 +1291,26 @@ def dashboard_html(state: State) -> str:
 
   <div class="fs-share-card">
     <div class="fs-share-copy">
-      <div class="eyebrow">PUBLIC LINK</div>
+      <div class="eyebrow">Share URL</div>
       <div class="fs-share-url" title="{public_display}">{public_display}</div>
       <div class="fs-share-meta">
         <span id="shareState">{html.escape(expiry_text)}</span>
-        <span aria-hidden="true">·</span>
-        <span id="statsText">0 downloads · 0 B transferred</span>
+        <span id="statsText">0 downloads, 0 B transferred</span>
       </div>
     </div>
     <div class="fs-share-actions">
       <button id="copyLink" type="button" class="ghost fs-action-btn">Copy link</button>
-      <button id="showQr" type="button" class="ghost fs-action-btn">QR code</button>
+      <button id="showQr" type="button" class="ghost fs-action-btn" aria-controls="qrPanel" aria-expanded="false">QR code</button>
     </div>
+  </div>
+
+  <div id="qrPanel" class="qr-panel" hidden role="region" aria-labelledby="qrTitle">
+    <div>
+      <div class="eyebrow">Scan to open</div>
+      <h2 id="qrTitle">Share link</h2>
+      <p id="qrStatus" class="muted" role="status" aria-live="polite">The QR code contains only the public URL. The password is never embedded.</p>
+    </div>
+    <canvas id="qrCanvas" width="220" height="220" role="img" aria-label="QR code for the share URL">QR code for the share URL</canvas>
   </div>
 
   <div class="toolbar">
@@ -1304,18 +1319,18 @@ def dashboard_html(state: State) -> str:
       <input id="search" type="search" placeholder="Search files…" autocomplete="off">
     </div>
     <div class="filter-group" role="group" aria-label="File filters">
-      <button class="filter active" data-filter="all" type="button">All</button>
-      <button class="filter" data-filter="archives" type="button">ZIP</button>
-      <button class="filter" data-filter="images" type="button">Images</button>
-      <button class="filter" data-filter="documents" type="button">Docs</button>
-      <button class="filter" data-filter="other" type="button">Other</button>
+      <button class="filter active" data-filter="all" type="button" aria-pressed="true">All</button>
+      <button class="filter" data-filter="archives" type="button" aria-pressed="false">ZIP</button>
+      <button class="filter" data-filter="images" type="button" aria-pressed="false">Images</button>
+      <button class="filter" data-filter="documents" type="button" aria-pressed="false">Docs</button>
+      <button class="filter" data-filter="other" type="button" aria-pressed="false">Other</button>
     </div>
   </div>
 
   <div class="fs-library-head">
     <div>
-      <div class="eyebrow">FILES</div>
-      <div class="fs-library-title"><strong id="fileCount">{file_count}</strong> available</div>
+      <div class="eyebrow">Files</div>
+      <div class="fs-library-title"><strong id="fileCount" aria-live="polite">{file_count}</strong> <span id="fileCountLabel">{'file' if file_count == 1 else 'files'}</span></div>
     </div>
     <div class="fs-library-actions">
       <input id="uploadInput" type="file" hidden>
@@ -1326,29 +1341,17 @@ def dashboard_html(state: State) -> str:
         </svg>
         <span>Refresh</span>
       </button>
-      <button id="downloadAll" type="button" class="animated-button fs-animated-button">
-        <span>Download all</span>
-        <span aria-hidden="true"></span>
-      </button>
+      <button id="downloadAll" type="button" class="fs-download-all">Download all</button>
     </div>
   </div>
   <p class="upload-note">Anyone with the share password can upload. Files are saved in this directory, existing names are never overwritten, and uploads are limited to {human_size(MAX_UPLOAD_SIZE)} each.</p>
   <p id="bundleStatus" class="upload-note" role="status" aria-live="polite" hidden></p>
 
-  <div id="qrPanel" class="qr-panel" hidden>
-    <div>
-      <div class="eyebrow">SCAN TO OPEN</div>
-      <h2>Share link</h2>
-      <p id="qrStatus" class="muted">The QR code contains only the public URL. The password is never embedded.</p>
-    </div>
-    <canvas id="qrCanvas" width="220" height="220" aria-label="QR code for the share URL"></canvas>
-  </div>
-
-  <div id="downloadProgress" class="progress-card" hidden aria-live="polite">
+  <div id="downloadProgress" class="progress-card" hidden role="region" aria-label="Download progress">
     <div class="progress-head"><strong id="progressName">Downloading</strong><span id="progressValue">0%</span></div>
-    <div class="progress-track"><div id="progressBar" class="progress-bar"></div></div>
+    <div class="progress-track" role="progressbar" aria-label="Download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="progressBar" class="progress-bar"></div></div>
     <div class="fs-transfer-status">
-      <div class="fs-transfer-copy"><strong id="progressStatus">Starting download…</strong><span id="progressMeta">Preparing transfer</span></div>
+      <div class="fs-transfer-copy"><strong id="progressStatus" role="status" aria-live="polite">Starting download…</strong><span id="progressMeta">Preparing transfer</span></div>
       <div class="fs-transfer-actions">
         <button id="transferAction" class="fs-transfer-btn is-active" type="button" disabled aria-live="polite">
           <span class="fs-svg-wrapper" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v10m0 0 4-4m-4 4-4-4M5 17v2a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
@@ -1369,30 +1372,21 @@ def dashboard_html(state: State) -> str:
     </div>
   </div>
 
-  <div id="uploadProgress" class="progress-card" hidden aria-live="polite">
+  <div id="uploadProgress" class="progress-card" hidden role="region" aria-label="Upload progress">
     <div class="progress-head"><strong id="uploadName">Uploading</strong><span id="uploadPercent">0%</span></div>
-    <div class="progress-track"><div id="uploadBar" class="progress-bar"></div></div>
+    <div class="progress-track" role="progressbar" aria-label="Upload progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div id="uploadBar" class="progress-bar"></div></div>
     <div class="fs-transfer-status">
-      <div class="fs-transfer-copy"><strong id="uploadStatus">Choose a file to upload</strong><span id="uploadMeta">Maximum size: {human_size(MAX_UPLOAD_SIZE)}</span></div>
+      <div class="fs-transfer-copy"><strong id="uploadStatus" role="status" aria-live="polite">Choose a file to upload</strong><span id="uploadMeta">Maximum size: {human_size(MAX_UPLOAD_SIZE)}</span></div>
       <div class="fs-transfer-actions"><button id="cancelUpload" class="ghost small" type="button">Cancel</button></div>
     </div>
   </div>
 
   <div id="fileLoading" class="fs-loading" aria-live="polite">
-    <div class="fs-stage-loading">
-      <div class="fs-3d-loader" aria-hidden="true">
-        <div class="ground"><div></div></div>
-        <div class="box box0"><div></div></div><div class="box box1"><div></div></div><div class="box box2"><div></div></div><div class="box box3"><div></div></div>
-        <div class="box box4"><div></div></div><div class="box box5"><div></div></div><div class="box box6"><div></div></div><div class="box box7"><div></div></div>
-      </div>
-    </div>
-    <div class="fs-loader" aria-hidden="true">
-      <p id="fileLoadingText" class="loader-text fs-loader-text">Loading files</p>
-      <span class="load fs-load"></span>
-    </div>
+    <span class="fs-spinner" aria-hidden="true"></span>
+    <span id="fileLoadingText">Loading files…</span>
   </div>
 
-  <div id="fileList" class="file-list" aria-live="polite">
+  <div id="fileList" class="file-list" role="list" aria-busy="true">
     <div class="file-skeleton" aria-hidden="true">
       <div class="file-skeleton-icon"></div>
       <div class="file-skeleton-main"><div class="file-skeleton-line wide"></div><div class="file-skeleton-line medium"></div></div>
@@ -1409,7 +1403,7 @@ def dashboard_html(state: State) -> str:
       <div class="file-skeleton-dot"></div>
     </div>
   </div>
-  <div id="emptyState" class="empty" hidden>No matching files.</div>
+  <div id="emptyState" class="empty" role="status" aria-live="polite" hidden>No files are available in this share yet.</div>
 </section>
 """
 
