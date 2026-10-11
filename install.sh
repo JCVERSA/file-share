@@ -2,7 +2,10 @@
 set -eu
 
 REPO="JCVERSA/file-share"
-BRANCH="main"
+# This copy of the installer lives on the branch below, so a plain install
+# from this URL installs this branch. Override with --branch or
+# FILE_SHARE_BRANCH (for example FILE_SHARE_BRANCH=main).
+BRANCH="${FILE_SHARE_BRANCH:-arena/fe0ef9e9-file-share}"
 ARCHIVE_URL="https://github.com/$REPO/archive/refs/heads/$BRANCH.zip"
 RAW_BASE="https://raw.githubusercontent.com/$REPO/$BRANCH"
 
@@ -54,11 +57,18 @@ while [ "$#" -gt 0 ]; do
             [ "$#" -gt 0 ] || die "--source-dir requires a directory"
             SOURCE_DIR=$1
             ;;
+        --branch)
+            shift
+            [ "$#" -gt 0 ] || die "--branch requires a branch name"
+            BRANCH=$1
+            ;;
         --help|-h) usage; exit 0 ;;
         *) die "Unknown option: $1" ;;
     esac
     shift
 done
+
+printf '%s' "$BRANCH" | grep -Eq '^[A-Za-z0-9._/-]+$' || die "Invalid branch name: $BRANCH"
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 

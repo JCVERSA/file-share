@@ -2,7 +2,8 @@ param(
     [switch]$Update,
     [switch]$DryRun,
     [switch]$Force,
-    [switch]$Help
+    [switch]$Help,
+    [string]$Branch
 )
 
 Set-StrictMode -Version Latest
@@ -10,7 +11,11 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $Repo = 'JCVERSA/file-share'
-$Branch = 'main'
+# This copy of the installer lives on the branch below, so a plain install
+# from this URL installs this branch. Override with -Branch or
+# $env:FILE_SHARE_BRANCH (for example FILE_SHARE_BRANCH=main).
+$Branch = if ($Branch) { $Branch } elseif ($env:FILE_SHARE_BRANCH) { $env:FILE_SHARE_BRANCH } else { 'arena/fe0ef9e9-file-share' }
+if ($Branch -notmatch '^[A-Za-z0-9._/-]+$') { throw "Invalid branch name: $Branch" }
 $ArchiveUrl = "https://github.com/$Repo/archive/refs/heads/$Branch.zip"
 $RawBase = "https://raw.githubusercontent.com/$Repo/$Branch"
 $DataDir = Join-Path $env:LOCALAPPDATA 'FileShare'
@@ -35,6 +40,7 @@ Options when running the script directly:
   -Update     Explicit update mode
   -DryRun     Download and validate without installing
   -Force      Reinstall the same version
+  -Branch NAME Install/update from a specific branch (default: arena/fe0ef9e9-file-share)
 "@
     exit 0
 }

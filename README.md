@@ -44,6 +44,17 @@ Install or update File Share:
 curl -fsSL "https://raw.githubusercontent.com/JCVERSA/file-share/main/install.sh" | sh
 ```
 
+To install a specific branch, fetch the installer from that branch — the
+installer installs and updates from the branch it was fetched from:
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/JCVERSA/file-share/arena/fe0ef9e9-file-share/install.sh" | sh
+```
+
+The branch can also be overridden without changing the installer URL:
+`... | sh -s -- --branch NAME` (or `FILE_SHARE_BRANCH=NAME ... | sh`) on Linux,
+and `-Branch NAME` (or `$env:FILE_SHARE_BRANCH`) on Windows.
+
 Then simply run:
 
 ```bash
