@@ -159,7 +159,7 @@ mkdir -p "$USER_DATA_DIR" "$BACKUP_DIR" "$USER_BIN_DIR"
 rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR"
 cp -R "$PROJECT_DIR"/. "$STAGE_DIR"/
-rm -rf "$STAGE_DIR/__pycache__" "$STAGE_DIR/.git" "$STAGE_DIR/.github"
+rm -rf "$STAGE_DIR/__pycache__" "$STAGE_DIR/.git" "$STAGE_DIR/.github" "$STAGE_DIR/tests"
 
 # Validate the staged project before touching the active installation.
 python3 -m py_compile "$STAGE_DIR/server.py"
@@ -173,6 +173,7 @@ if not m: raise SystemExit('APP_VERSION missing')
 if not (p.parent / 'templates' / 'index.html').is_file(): raise SystemExit('templates/index.html missing')
 print(f"Validated File Share {m.group(1)}")
 PY
+rm -rf "$STAGE_DIR/__pycache__"
 
 BACKUP=""
 if [ -d "$INSTALL_DIR" ]; then

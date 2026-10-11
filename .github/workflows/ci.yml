@@ -1,0 +1,56 @@
+name: File Share checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile Python source
+        run: python -B -c "compile(open('server.py', encoding='utf-8').read(), 'server.py', 'exec')"
+      - name: Run standard-library tests
+        run: python -B -m unittest discover -s tests -v
+      - name: Check shell installer syntax
+        run: sh -n install.sh && sh -n uninstall.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check bundled QR JavaScript and checksum
+        run: |
+          node --check static/qrcode-generator.js
+          sha512sum --check static/SHA512SUMS
+      - name: Check inline dashboard JavaScript
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
+          import tempfile
+
+          template = Path('templates/index.html').read_text(encoding='utf-8')
+          marker = '  <script nonce="{{NONCE}}">'
+          start = template.index(marker) + len(marker)
+          end = template.index('</script>', start)
+          script = template[start:end].replace(
+              '{{APP_DATA}}',
+              json.dumps({
+                  'public_url': None,
+                  'one_time': False,
+                  'progress_limit': 52428800,
+                  'max_upload_size': 1073741824,
+              }),
+          )
+          with tempfile.NamedTemporaryFile('w', suffix='.js', encoding='utf-8') as output:
+              output.write(script)
+              output.flush()
+              subprocess.run(['node', '--check', output.name], check=True)
+          PY

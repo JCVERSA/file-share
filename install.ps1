@@ -97,9 +97,11 @@ try {
     Copy-Item -Path (Join-Path $project.FullName '*') -Destination $stage -Recurse -Force
     Remove-Item -LiteralPath (Join-Path $stage '__pycache__') -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath (Join-Path $stage '.git') -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $stage 'tests') -Recurse -Force -ErrorAction SilentlyContinue
 
     & $python.Source -m py_compile (Join-Path $stage 'server.py')
     if ($LASTEXITCODE -ne 0) { Fail 'Python validation failed.' }
+    Remove-Item -LiteralPath (Join-Path $stage '__pycache__') -Recurse -Force -ErrorAction SilentlyContinue
 
     $backup = $null
     if (Test-Path $InstallDir) {

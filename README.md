@@ -14,9 +14,11 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - Login rate limiting: 5 attempts per client per minute.
 - Immediate regular files only; no recursive browsing.
 - Symlinks are excluded.
-- File-path validation and `O_NOFOLLOW` where available.
+- File-name validation and directory-relative, no-follow file opens on POSIX; symlinks are excluded.
 - Streaming downloads with range support for large files.
-- `Download all` creates a temporary ZIP and streams it to the client.
+- `Download all` creates a temporary ZIP and streams it to the client; bundles are limited to 2 GiB of source files and checked against available temporary disk space.
+- Authenticated users can upload files into the shared directory; uploads are atomic, never overwrite existing names, and are limited to 1 GiB per file.
+- Only one upload or ZIP build/transfer may use the application's disk-work slot at a time.
 - Client-side search and category filters.
 - Copy-link button.
 - GitHub project button linking to `https://github.com/JCVERSA/file-share`.
@@ -148,7 +150,7 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 
 ```text
 ================================================================
-  TEMPORARY FILE SHARE v3.5.1
+  TEMPORARY FILE SHARE v3.6.0
 ================================================================
   Directory : /root/swiftslate-secrets
   Local     : http://127.0.0.1:43821/
@@ -165,15 +167,15 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 
 ## Security model
 
-The Python origin binds to loopback by default. Only the selected directory's immediate regular files are exposed. The application does not browse subdirectories and ignores symbolic links.
+The Python origin binds to loopback by default. Only the selected directory's immediate regular files are exposed. The application does not browse subdirectories and ignores symbolic links. POSIX builds pin the shared directory with a directory file descriptor and open children relative to it. Platforms without these APIs recheck the root directory identity, but cannot eliminate every path-replacement race; do not let untrusted local users modify the shared directory.
 
-The browser session uses an HTTP-only SameSite cookie. When the public URL exists, the cookie is also marked Secure.
+The browser session uses an HTTP-only SameSite cookie. When the Cloudflare public URL exists, the cookie is also marked Secure. Same-origin checks protect login, upload, logout, and stop-share requests; Fetch Metadata checks reject cross-site download requests. With a wildcard `--host`, use the server's IP for direct access; unconfigured DNS aliases are deliberately not trusted as origins.
 
-The QR code contains only the public URL, never the password.
+The QR code contains only the public URL, never the password. Its JavaScript implementation is bundled locally; no QR-generation API or third-party CDN request is used at runtime.
 
-The password and public URL are separate secrets. Anyone who has both can use the share while it is active.
+The password and public URL are separate secrets. Anyone who has both can view, download, and upload files while the share is active. Uploads are saved into the shared directory, do not overwrite existing names, and remain there after the share stops; remove them from the host directory when no longer needed.
 
-Share a dedicated directory rather than a broad system directory. The application refuses to share `/` itself.
+Share a dedicated directory rather than a broad system directory. The application refuses to share a filesystem root (including `/` and Windows drive roots). A non-loopback `--host` uses plain HTTP even when a Cloudflare tunnel is enabled; the server has no trusted-proxy configuration. Keep it on loopback unless you understand the network exposure, and do not expose it to an untrusted network.
 
 ## Cloudflare Quick Tunnel
 
@@ -183,13 +185,17 @@ The application uses an isolated temporary Cloudflare configuration directory, s
 
 ## QR code
 
-The interface uses the `qrcode` browser build from jsDelivr at version 1.5.4. The library runs in the browser; the QR payload is the already-visible public URL and is not sent to a QR-generation API.
-
-If the browser cannot load the CDN asset, the file-sharing functionality still works; only the QR display is unavailable.
+The dashboard uses a locally served copy of `qrcode-generator` 1.4.4 (MIT license), loaded with a SHA-512 Subresource Integrity hash. The matching checksum is stored in `static/SHA512SUMS` and checked by CI. The QR payload is the already-visible public URL and is not sent to a QR-generation API or third-party CDN.
 
 ## Large files
 
-The backend streams files in 1 MiB chunks and supports byte ranges for resumable browser downloads. The optional progress UI uses an in-browser buffered request only for files up to 50 MiB to avoid forcing very large files into browser memory. Larger files use the normal browser download path.
+The backend streams files in 1 MiB chunks and supports byte ranges for resumable browser downloads. The optional download-progress UI uses an in-browser buffered request only for files up to 50 MiB to avoid forcing very large files into browser memory. Larger files use the normal browser download path.
+
+**Download all** supports up to 2 GiB of source files and needs temporary disk space approximately equal to the files being bundled. The server checks available space and serializes ZIP creation with uploads. Individual downloads are not subject to this bundle limit.
+
+## Uploading files
+
+After signing in, choose **Upload file** to send one file to the shared directory. Uploads stream in bounded chunks, display progress, and are limited to 1 GiB per file. Existing files are never overwritten; if a name conflicts, rename the local file and retry. Only one upload or ZIP operation runs at a time. Anyone with the share password can upload, so share credentials only with people trusted to write into the host directory.
 
 ## Refreshing the file list
 
@@ -197,18 +203,18 @@ The **Refresh** button re-reads the shared directory without restarting the serv
 
 ## Stop sharing
 
-Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become invalid, and temporary tunnel/bundle files are removed.
+Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become invalid, and temporary tunnel/bundle files are removed. Uploaded files remain in the shared directory; remove them from the host if they should not persist.
 
 ## Validation status
 
 The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
 
 
-## v3.5.1
+## v3.6.0
 
-Public Cloudflare URL verification is best-effort. If the VPS/container cannot resolve `trycloudflare.com`, the share stays online and the CLI reports `UNVERIFIED` instead of stopping the tunnel.
+Adds authenticated, atomic uploads; upload and bundle limits; same-origin checks for state-changing actions; POSIX directory-descriptor file access; and a locally served QR library. Public Cloudflare URL verification remains best-effort: if the VPS/container cannot resolve `trycloudflare.com`, the share stays online and the CLI reports `UNVERIFIED` instead of stopping the tunnel.
 
 
 ## Dashboard UI
 
-The dashboard includes scoped motion components for download progress and completion, a compact 3D loading/archive scene, skeleton loading, stop-share feedback, and the project GitHub action. Motion is automatically reduced when the browser requests `prefers-reduced-motion`.
+The dashboard includes upload and download progress, a non-blocking archive status, a compact 3D loading scene, skeleton loading, stop-share feedback, and the project GitHub action. Motion is automatically reduced when the browser requests `prefers-reduced-motion`.
