@@ -43,7 +43,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.6.0"
+APP_VERSION = "3.6.1"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 QR_SCRIPT_PATH = Path(__file__).resolve().parent / "static" / "qrcode-generator.js"
 SESSION_COOKIE = "fs_session"

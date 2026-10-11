@@ -11,7 +11,7 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 - Random password generated on every launch and printed in the terminal.
 - Automatic share expiration (default: 30 minutes).
 - Optional `--one-time` mode: the whole share stops after the first completed file or bundle download.
-- Login rate limiting: 5 attempts per client per minute.
+- Login rate limiting: 5 attempts per client per minute; proxy headers (`CF-Connecting-IP` / `X-Forwarded-For`) are trusted only from the local tunnel, so a directly connected client cannot pick its own rate-limit bucket.
 - Immediate regular files only; no recursive browsing.
 - Symlinks are excluded.
 - File-name validation and directory-relative, no-follow file opens on POSIX; symlinks are excluded.
@@ -150,7 +150,7 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 
 ```text
 ================================================================
-  TEMPORARY FILE SHARE v3.6.0
+  TEMPORARY FILE SHARE v3.6.1
 ================================================================
   Directory : /root/swiftslate-secrets
   Local     : http://127.0.0.1:43821/
@@ -169,7 +169,7 @@ The terminal prints the password and public URL when the Cloudflare Quick Tunnel
 
 The Python origin binds to loopback by default. Only the selected directory's immediate regular files are exposed. The application does not browse subdirectories and ignores symbolic links. POSIX builds pin the shared directory with a directory file descriptor and open children relative to it. Platforms without these APIs recheck the root directory identity, but cannot eliminate every path-replacement race; do not let untrusted local users modify the shared directory.
 
-The browser session uses an HTTP-only SameSite cookie. When the Cloudflare public URL exists, the cookie is also marked Secure. Same-origin checks protect login, upload, logout, and stop-share requests; Fetch Metadata checks reject cross-site download requests. With a wildcard `--host`, use the server's IP for direct access; unconfigured DNS aliases are deliberately not trusted as origins.
+The browser session uses an HTTP-only SameSite cookie, valid for up to 12 hours or until the share stops, whichever comes first. The cookie is marked Secure only for requests that arrive at the public URL's host, where the browser's connection is HTTPS; direct plain-HTTP access (loopback or a wildcard `--host` IP) is not marked Secure, because browsers reject a Secure cookie set over plain HTTP on a non-loopback host. Same-origin checks protect login, upload, logout, and stop-share requests; Fetch Metadata checks reject cross-site download requests. With a wildcard `--host`, use the server's IP for direct access; unconfigured DNS aliases are deliberately not trusted as origins.
 
 The QR code contains only the public URL, never the password. Its JavaScript implementation is bundled locally; no QR-generation API or third-party CDN request is used at runtime.
 
@@ -209,6 +209,10 @@ Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become in
 
 The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
 
+
+## v3.6.1
+
+Security and reliability fixes: the session cookie is marked `Secure` only for requests that arrive at the public URL's host (the origin always speaks plain HTTP; browsers reject a `Secure` cookie set over plain HTTP on non-loopback hosts, which broke the documented direct-access workflow in tunnel mode); login rate limiting now trusts `CF-Connecting-IP` / `X-Forwarded-For` only from loopback peers (the local Quick Tunnel), so directly connected clients can no longer bypass the limiter; idle HTTP connections are closed after 60 seconds so a stalled client cannot pin a server thread (and, through the tunnel, a Cloudflare in-flight slot); and upload temp files older than one hour left behind by a crashed run are removed at startup. The project is now released under the MIT license. CI runs a Python 3.10–3.12 matrix, a pyflakes lint step, and a PowerShell installer syntax check.
 
 ## v3.6.0
 
