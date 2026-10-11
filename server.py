@@ -43,7 +43,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.6.1"
+APP_VERSION = "3.6.2"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 QR_SCRIPT_PATH = Path(__file__).resolve().parent / "static" / "qrcode-generator.js"
 SESSION_COOKIE = "fs_session"
@@ -278,6 +278,32 @@ def load_template() -> str:
     if any(item not in template for item in required):
         fail("Template is missing one or more required placeholders.")
     return template
+
+
+def verify_public_url(url: str, attempts: int = 3, delay: float = 2.0) -> str:
+    """Return 'ok', or a short description of the last failed attempt.
+
+    Retries because the Cloudflare edge can take a moment after tunnel
+    creation to serve the new hostname (transient 530 responses).
+    """
+    result = "unreachable (no attempt made)"
+    for attempt in range(attempts):
+        request = Request(url + "/", headers={"User-Agent": f"file-share-verifier/{APP_VERSION}"})
+        try:
+            with urlopen(request, timeout=20) as response:
+                status = int(getattr(response, "status", response.getcode()))
+                if status == 200:
+                    return "ok"
+                result = f"HTTP {status}"
+        except HTTPError as exc:
+            result = f"HTTP {exc.code}"
+        except URLError as exc:
+            result = f"unreachable ({exc.reason})"
+        except OSError as exc:
+            result = f"unreachable ({exc})"
+        if attempt < attempts - 1:
+            time.sleep(delay)
+    return result
 
 
 def download_stream(url: str, destination: Path, *, headers: dict[str, str] | None = None, timeout: int = 60) -> str:
@@ -721,10 +747,57 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
         return origin in allowed
 
     def require_same_origin(self) -> bool:
-        if self.request_origin_is_valid():
+        raw_origin = self.headers.get("Origin", "")
+        if raw_origin:
+            # Browser form posts always carry Origin. An invalid one is an
+            # explicit cross-site request and must be rejected outright.
+            if self.request_origin_is_valid():
+                return True
+            self.send_json({"error": "same-origin request required"}, status=403)
+            return False
+        # No Origin: some browsers omit it on top-level form navigations and
+        # privacy tooling may strip it. Sec-Fetch-Site is browser-attested and
+        # cannot be set or removed by web content, so same-origin fetch
+        # metadata is accepted; an explicit cross-site value is rejected.
+        fetch_site = self.headers.get("Sec-Fetch-Site", "").strip().lower()
+        if fetch_site == "same-origin":
+            return True
+        if fetch_site:
+            self.send_json({"error": "same-origin request required"}, status=403)
+            return False
+        # A request with no Origin and no fetch metadata is not a browser
+        # submission; a raw client has no browser victim to protect, so a
+        # direct local peer serving one of our own hosts is accepted.
+        if self._direct_local_peer():
             return True
         self.send_json({"error": "same-origin request required"}, status=403)
         return False
+
+    def _direct_local_peer(self) -> bool:
+        """True for a direct loopback peer whose Host header is one we serve."""
+        try:
+            peer = self.client_address[0]
+        except (IndexError, TypeError, OSError):
+            return False
+        if not is_loopback_host(peer):
+            return False
+        host_header = (self.headers.get("Host") or "").strip()
+        host = urlparse(f"http://{host_header}").hostname or "" if host_header else ""
+        if not host:
+            return False
+        trusted = set()
+        if self.state.public_url:
+            public_host = urlparse(self.state.public_url).hostname
+            if public_host:
+                trusted.add(public_host)
+        local_host = origin_host_for_bind(self.state.config.host)
+        trusted.add(local_host)
+        if is_loopback_host(local_host):
+            trusted.update({"localhost", "127.0.0.1", "::1"})
+        configured_host = self.state.config.host.strip().lower()
+        if configured_host not in {"0.0.0.0", "::"}:
+            trusted.add(configured_host)
+        return host in trusted
 
     def require_same_origin_fetch(self) -> bool:
         fetch_site = self.headers.get("Sec-Fetch-Site")

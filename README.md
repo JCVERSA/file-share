@@ -221,6 +221,18 @@ Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become in
 The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
 
 
+## v3.6.2
+
+Login now works when the browser submits the form without a usable `Origin`
+header: an invalid `Origin` is still rejected outright (the real CSRF case),
+but when `Origin` is absent the server falls back to the browser-attested
+`Sec-Fetch-Site` header (which web content cannot forge), and, for requests
+with no browser metadata at all, accepts direct local peers serving one of
+its own hosts (raw clients have no browser victim to protect; the password
+and per-IP rate limiting still gate everything). Public URL verification
+also retries a few times, since the Cloudflare edge can lag briefly after
+tunnel creation (transient 530).
+
 ## v3.6.1
 
 Security and reliability fixes: the session cookie is marked `Secure` only for requests that arrive at the public URL's host (the origin always speaks plain HTTP; browsers reject a `Secure` cookie set over plain HTTP on non-loopback hosts, which broke the documented direct-access workflow in tunnel mode); login rate limiting now trusts `CF-Connecting-IP` / `X-Forwarded-For` only from loopback peers (the local Quick Tunnel), so directly connected clients can no longer bypass the limiter; idle HTTP connections are closed after 60 seconds so a stalled client cannot pin a server thread (and, through the tunnel, a Cloudflare in-flight slot); and upload temp files older than one hour left behind by a crashed run are removed at startup. The project is now released under the MIT license. CI runs a Python 3.10–3.12 matrix, a pyflakes lint step, and a PowerShell installer syntax check.

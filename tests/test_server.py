@@ -14,7 +14,7 @@ import threading
 import time
 import unittest
 from unittest import mock
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 import zipfile
@@ -456,6 +456,63 @@ class FileShareTests(unittest.TestCase):
             self.assertEqual(cross_origin.exception.code, 403)
         finally:
             proxy_share.close()
+
+    def raw_login(self, port: int, body: bytes, headers: dict[str, str]) -> tuple[int, str]:
+        connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        connection.request("POST", "/login", body=body, headers=headers)
+        response = connection.getresponse()
+        status = response.status
+        cookie = response.getheader("Set-Cookie") or ""
+        response.read()
+        connection.close()
+        return status, cookie
+
+    def test_login_without_origin_falls_back_to_fetch_site(self) -> None:
+        # Some browsers omit Origin on top-level form navigations and
+        # privacy tooling may strip it; Sec-Fetch-Site is browser-attested
+        # and cannot be forged by web content.
+        body = urlencode({"password": self.share.state.password}).encode()
+        status, cookie = self.raw_login(
+            self.share.config.port,
+            body,
+            {"Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin"},
+        )
+        self.assertEqual(status, 303)
+        self.assertIn("fs_session=", cookie)
+
+        # An explicit cross-site fetch context is still rejected.
+        status, _ = self.raw_login(
+            self.share.config.port,
+            body,
+            {"Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "cross-site"},
+        )
+        self.assertEqual(status, 403)
+
+    def test_login_without_browser_metadata_from_local_peer(self) -> None:
+        # A raw client (curl, local script) sends no Origin and no fetch
+        # metadata; it has no browser victim to protect, so a direct local
+        # peer may still present the password.
+        body = urlencode({"password": self.share.state.password}).encode()
+        status, cookie = self.raw_login(
+            self.share.config.port,
+            body,
+            {"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        self.assertEqual(status, 303)
+        self.assertIn("fs_session=", cookie)
+
+    def test_public_url_verification_retries_transient_errors(self) -> None:
+        good = mock.Mock()
+        good.status = 200
+        good.__enter__ = mock.Mock(return_value=good)
+        good.__exit__ = mock.Mock(return_value=False)
+        transient = HTTPError("https://x.trycloudflare.com/", 530, "origin unreachable", None, None)
+        with mock.patch.object(app, "urlopen", side_effect=[transient, transient, good]) as opener:
+            self.assertEqual(app.verify_public_url("https://x.trycloudflare.com", delay=0), "ok")
+            self.assertEqual(opener.call_count, 3)
+
+        with mock.patch.object(app, "urlopen", side_effect=URLError("name resolution failed")):
+            self.assertIn("unreachable", app.verify_public_url("https://x.trycloudflare.com", attempts=2, delay=0))
 
     def test_allowed_origin_normalization_rejects_garbage(self) -> None:
         with self.assertRaises(SystemExit):
