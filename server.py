@@ -422,13 +422,19 @@ class State:
         return not self.stop_event.is_set()
 
     def client_id(self, handler: http.server.BaseHTTPRequestHandler) -> str:
-        # The origin only binds to loopback by default. Quick Tunnel supplies
-        # CF-Connecting-IP to the local origin for public clients.
-        return (
-            handler.headers.get("CF-Connecting-IP")
-            or handler.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-            or handler.client_address[0]
-        )
+        peer = handler.client_address[0]
+        # Cloudflare's Quick Tunnel connects to the origin from loopback and
+        # supplies CF-Connecting-IP for the real public client. Trust proxy
+        # headers only from a loopback peer; a directly connected client must
+        # not be able to pick its own rate-limit bucket.
+        if is_loopback_host(peer):
+            forwarded = (
+                handler.headers.get("CF-Connecting-IP")
+                or handler.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+            )
+            if forwarded:
+                return forwarded
+        return peer
 
     def allow_login_attempt(self, client: str) -> tuple[bool, int]:
         now = time.time()
@@ -491,8 +497,20 @@ class State:
                     self.sessions.pop(value, None)
                 return
 
-    def cookie_suffix(self) -> str:
-        secure = "; Secure" if self.public_url else ""
+    def cookie_suffix(self, handler: http.server.BaseHTTPRequestHandler) -> str:
+        # The origin always speaks plain HTTP (Cloudflare terminates TLS for
+        # the public URL), so the Secure attribute is attached only when the
+        # request arrived at the public URL's host — where the browser's
+        # connection is HTTPS. Browsers reject Secure cookies set over plain
+        # HTTP on non-loopback hosts, which would break documented direct
+        # access (loopback or a wildcard --host IP).
+        secure = ""
+        if self.public_url:
+            public_host = urlparse(self.public_url).hostname or ""
+            host_header = (handler.headers.get("Host") or "").strip()
+            request_host = urlparse(f"http://{host_header}").hostname or ""
+            if public_host and request_host == public_host:
+                secure = "; Secure"
         return f"; Path=/; HttpOnly{secure}; SameSite=Strict"
 
     def record_start(self, name: str) -> None:
@@ -537,6 +555,9 @@ class BundleTooLargeError(Exception):
 
 class ShareHandler(http.server.BaseHTTPRequestHandler):
     server_version = f"FileShare/{APP_VERSION}"
+    # Close idle connections after this many seconds so a stalled client
+    # cannot pin a handler thread (and, through the tunnel, a Cloudflare slot).
+    timeout = 60
 
     @property
     def state(self) -> State:
@@ -784,7 +805,7 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
             self.state.revoke_session(self)
             self.send_response(303)
             self.send_header("Location", "/")
-            self.send_header("Set-Cookie", f"{SESSION_COOKIE}=deleted; Max-Age=0{self.state.cookie_suffix()}")
+            self.send_header("Set-Cookie", f"{SESSION_COOKIE}=deleted; Max-Age=0{self.state.cookie_suffix(self)}")
             self.end_headers()
             return
         if parsed.path == "/stop-share":
@@ -1013,7 +1034,7 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
         token = self.state.create_session()
         self.send_response(303)
         self.send_header("Location", "/")
-        self.send_header("Set-Cookie", f"{SESSION_COOKIE}={token}; Max-Age={SESSION_TTL}{self.state.cookie_suffix()}")
+        self.send_header("Set-Cookie", f"{SESSION_COOKIE}={token}; Max-Age={SESSION_TTL}{self.state.cookie_suffix(self)}")
         self.end_headers()
 
     @staticmethod

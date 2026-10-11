@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import http.client
 import http.cookiejar
 import io
 import json
 import os
 from pathlib import Path
+import socket
 import tempfile
 import threading
+import time
 import unittest
 from unittest import mock
 from urllib.error import HTTPError
@@ -70,6 +73,23 @@ class RunningShare:
         headers = {"Content-Type": "application/octet-stream", "Origin": origin or self.origin}
         return self.open("/upload/" + quote(name, safe=""), method="PUT", data=data, headers=headers)
 
+    def login_raw(self, *, host: str | None = None, origin: str | None = None) -> str:
+        """POST /login without following the redirect; return the raw Set-Cookie header."""
+        connection = http.client.HTTPConnection("127.0.0.1", self.config.port, timeout=5)
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Origin": origin or self.origin,
+        }
+        if host is not None:
+            headers["Host"] = host
+        body = urlencode({"password": self.state.password}).encode()
+        connection.request("POST", "/login", body=body, headers=headers)
+        response = connection.getresponse()
+        cookie = response.getheader("Set-Cookie") or ""
+        response.read()
+        connection.close()
+        return cookie
+
 
 class FileShareTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -123,6 +143,93 @@ class FileShareTests(unittest.TestCase):
         with self.assertRaises(HTTPError) as cross_origin:
             build_opener().open(request, timeout=5)
         self.assertEqual(cross_origin.exception.code, 403)
+
+    def test_secure_cookie_only_for_public_url_host(self) -> None:
+        # No public URL: plain-HTTP session cookie, no Secure attribute.
+        cookie = self.share.login_raw()
+        self.assertIn("HttpOnly", cookie)
+        self.assertIn("SameSite=Strict", cookie)
+        self.assertNotIn("Secure", cookie)
+
+        # Public URL active: direct plain-HTTP access must NOT get Secure,
+        # because browsers reject Secure cookies set over plain HTTP on
+        # non-loopback hosts.
+        self.share.state.public_url = "https://example.trycloudflare.com"
+        cookie = self.share.login_raw()
+        self.assertIn("HttpOnly", cookie)
+        self.assertNotIn("Secure", cookie)
+
+        # Requests that arrive at the public URL's host do get Secure
+        # (the browser's connection there is HTTPS).
+        cookie = self.share.login_raw(host="example.trycloudflare.com")
+        self.assertIn("Secure", cookie)
+
+    def test_proxy_headers_trusted_only_from_loopback_peers(self) -> None:
+        state = self.share.state
+
+        class FakeHandler:
+            def __init__(self, peer: str, headers: dict[str, str] | None = None):
+                self.client_address = (peer, 51234)
+                self.headers = headers or {}
+
+        # A directly connected client cannot pick its own rate-limit bucket.
+        direct = FakeHandler(
+            "198.51.100.7",
+            {"CF-Connecting-IP": "10.9.9.9", "X-Forwarded-For": "10.8.8.8, 10.7.7.7"},
+        )
+        self.assertEqual(state.client_id(direct), "198.51.100.7")
+
+        # The local tunnel (loopback peer) is trusted for proxy headers.
+        tunnel = FakeHandler("127.0.0.1", {"CF-Connecting-IP": "10.9.9.9"})
+        self.assertEqual(state.client_id(tunnel), "10.9.9.9")
+
+        forwarded_only = FakeHandler("::1", {"X-Forwarded-For": "2001:db8::1, 127.0.0.1"})
+        self.assertEqual(state.client_id(forwarded_only), "2001:db8::1")
+
+        bare = FakeHandler("10.1.2.3")
+        self.assertEqual(state.client_id(bare), "10.1.2.3")
+
+    def test_handler_has_request_timeout(self) -> None:
+        self.assertGreaterEqual(app.ShareHandler.timeout, 5)
+
+    def test_idle_connection_is_closed(self) -> None:
+        class ShortTimeoutHandler(app.ShareHandler):
+            timeout = 1
+
+            def log_message(self, _fmt: str, *_args: object) -> None:
+                pass
+
+        httpd = app.http.server.ThreadingHTTPServer(("127.0.0.1", 0), ShortTimeoutHandler)
+        httpd.daemon_threads = True
+        httpd.share_state = self.share.state
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        port = int(httpd.server_address[1])
+        try:
+            # The server still answers normal requests...
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+            connection.request("GET", "/api/files")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 401)
+            response.read()
+            connection.close()
+
+            # ...and closes a connection that never sends a request.
+            idle = socket.create_connection(("127.0.0.1", port), timeout=5)
+            idle.settimeout(5)
+            started = time.monotonic()
+            try:
+                while idle.recv(4096):
+                    pass
+                closed = True
+            except socket.timeout:
+                closed = False
+            self.assertTrue(closed, "server did not close the idle connection")
+            self.assertLessEqual(time.monotonic() - started, 5)
+            idle.close()
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
 
     def test_upload_requires_authentication(self) -> None:
         request = Request(
