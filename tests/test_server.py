@@ -28,10 +28,10 @@ class QuietShareHandler(app.ShareHandler):
 
 
 class RunningShare:
-    def __init__(self, root: Path, *, one_time: bool = False):
+    def __init__(self, root: Path, *, one_time: bool = False, extra_origins: frozenset[str] = frozenset()):
         self.root = root
         self.temp = tempfile.TemporaryDirectory(prefix="file-share-test-state-")
-        self.config = app.Config(root, "127.0.0.1", 0, True, None, one_time)
+        self.config = app.Config(root, "127.0.0.1", 0, True, None, one_time, extra_origins)
         self.state = app.State(self.config, Path(self.temp.name))
         self.state.open_root()
         self.httpd = app.http.server.ThreadingHTTPServer(("127.0.0.1", 0), QuietShareHandler)
@@ -423,6 +423,46 @@ class FileShareTests(unittest.TestCase):
         self.assertFalse(old.exists())
         self.assertTrue(fresh.exists())
         self.assertTrue((self.root / "sample.txt").exists())
+
+    def test_allowed_origin_for_trusted_proxy(self) -> None:
+        # Default posture is unchanged: framing denied, foreign origins rejected.
+        page = self.share.open("/")
+        self.assertEqual(page.getheader("X-Frame-Options"), "DENY")
+        self.assertIn("frame-ancestors 'none'", page.getheader("Content-Security-Policy"))
+
+        proxy_share = RunningShare(self.root, extra_origins=frozenset({"HTTPS://Proxy.Example"}))
+        try:
+            # A configured origin may log in...
+            cookie = proxy_share.login_raw(origin="https://proxy.example")
+            self.assertIn("fs_session=", cookie)
+            self.assertIn("HttpOnly", cookie)
+            # ...and may frame the app; CSP frame-ancestors replaces DENY.
+            page = proxy_share.open("/")
+            csp = page.getheader("Content-Security-Policy")
+            self.assertIsNone(page.getheader("X-Frame-Options"))
+            self.assertIn("frame-ancestors 'self' https://proxy.example", csp)
+            # Any other origin is still rejected.
+            request = Request(
+                proxy_share.base + "login",
+                data=urlencode({"password": proxy_share.state.password}).encode(),
+                method="POST",
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Origin": "https://evil.example",
+                },
+            )
+            with self.assertRaises(HTTPError) as cross_origin:
+                build_opener().open(request, timeout=5)
+            self.assertEqual(cross_origin.exception.code, 403)
+        finally:
+            proxy_share.close()
+
+    def test_allowed_origin_normalization_rejects_garbage(self) -> None:
+        with self.assertRaises(SystemExit):
+            app.normalize_allowed_origin("not a url")
+        with self.assertRaises(SystemExit):
+            app.normalize_allowed_origin("https://x.example/evil")
+        self.assertEqual(app.normalize_allowed_origin("HTTPS://Proxy.Example:8443/"), "https://proxy.example:8443")
 
 
 if __name__ == "__main__":

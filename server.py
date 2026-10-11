@@ -371,13 +371,14 @@ def ensure_cloudflared(temp_root: Path) -> str:
 
 
 class Config:
-    def __init__(self, root: Path, host: str, port: int, no_tunnel: bool, expires: int | None, one_time: bool):
+    def __init__(self, root: Path, host: str, port: int, no_tunnel: bool, expires: int | None, one_time: bool, extra_origins: frozenset[str] = frozenset()):
         self.root = root
         self.host = host
         self.port = port
         self.no_tunnel = no_tunnel
         self.expires = expires
         self.one_time = one_time
+        self.extra_origins = frozenset(normalize_allowed_origin(value) for value in extra_origins)
 
 
 class State:
@@ -606,6 +607,11 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
 
     def send_security_headers(self, *, nonce: str | None = None) -> None:
         script_policy = f"'nonce-{nonce}' 'self'" if nonce else "'none'"
+        # Explicitly trusted origins (trusted reverse proxy / preview
+        # environment) may frame the app; when set, CSP frame-ancestors
+        # replaces the X-Frame-Options DENY header.
+        extra_origins = self.state.config.extra_origins
+        frame_ancestors = "'none'" if not extra_origins else " ".join(["'self'"] + sorted(extra_origins))
         csp = (
             "default-src 'self'; "
             f"script-src {script_policy}; "
@@ -614,11 +620,12 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
             "connect-src 'self'; "
             "font-src 'self'; "
             "form-action 'self'; "
-            "frame-ancestors 'none'; base-uri 'none'; object-src 'none'"
+            f"frame-ancestors {frame_ancestors}; base-uri 'none'; object-src 'none'"
         )
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("X-Frame-Options", "DENY")
+        if not extra_origins:
+            self.send_header("X-Frame-Options", "DENY")
         self.send_header("Content-Security-Policy", csp)
         self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
@@ -690,6 +697,7 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
             return False
         origin = f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
         allowed: set[str] = set()
+        allowed.update(self.state.config.extra_origins)
         if self.state.public_url:
             allowed.add(self.state.public_url.rstrip("/").lower())
         port = self.state.config.port
@@ -1487,6 +1495,15 @@ def origin_host_for_bind(host: str) -> str:
     return host.strip()
 
 
+def normalize_allowed_origin(value: str) -> str:
+    parsed = urlparse(value.strip())
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        fail(f"Invalid --allow-origin (expected http(s)://host[:port]): {value}")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        fail(f"Invalid --allow-origin (no path, query, or fragment allowed): {value}")
+    return f"{parsed.scheme.lower()}://{parsed.netloc.lower()}"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Authenticated temporary file sharing with optional Cloudflare Quick Tunnel.")
     parser.add_argument("--version", action="version", version=f"FileShare {APP_VERSION}")
@@ -1498,6 +1515,15 @@ def main() -> int:
     expiry_group.add_argument("--expires", default="30m", help="Share lifetime, e.g. 30m, 1h, 2d (default: 30m)")
     expiry_group.add_argument("--no-expiry", action="store_true", help="Disable automatic expiration")
     parser.add_argument("--one-time", action="store_true", help="Stop the whole share after the first completed file/bundle download")
+    parser.add_argument(
+        "--allow-origin",
+        action="append",
+        default=[],
+        metavar="ORIGIN",
+        help="Additional trusted Origin (http(s)://host[:port]) accepted by the same-origin "
+             "checks and allowed to frame the app. Use for a trusted reverse proxy or preview "
+             "environment that changes the hostname. May be repeated. Default: none.",
+    )
     args = parser.parse_args()
 
     root = Path(args.directory).expanduser()
@@ -1513,9 +1539,10 @@ def main() -> int:
         fail("Invalid port.")
 
     expires = None if args.no_expiry else parse_duration(args.expires)
+    extra_origins = frozenset(normalize_allowed_origin(value) for value in args.allow_origin)
     temp_root = Path(tempfile.mkdtemp(prefix="file-share-"))
     temp_root.chmod(0o700)
-    config = Config(root=root, host=args.host, port=args.port, no_tunnel=args.no_tunnel, expires=expires, one_time=args.one_time)
+    config = Config(root=root, host=args.host, port=args.port, no_tunnel=args.no_tunnel, expires=expires, one_time=args.one_time, extra_origins=extra_origins)
     state = State(config, temp_root)
 
     def stop_on_signal(signum: int, _frame: object) -> None:
@@ -1542,6 +1569,8 @@ def main() -> int:
         print(f"[INFO] Files: {len(state.files())}")
         print(f"[INFO] Expiry: {'disabled' if expires is None else args.expires}")
         print(f"[INFO] One-time: {'yes' if args.one_time else 'no'}")
+        if extra_origins:
+            print(f"[INFO] Extra allowed origins: {', '.join(sorted(extra_origins))}")
 
         binary = ""
         if not args.no_tunnel:
