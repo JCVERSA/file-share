@@ -216,6 +216,20 @@ Press `Ctrl+C`. The HTTP server and Quick Tunnel are stopped, sessions become in
 The project is designed for local verification with Python's standard library. A real public Quick Tunnel still depends on network access from the target VPS. The runtime confirms that the tunnel URL was created; public HTTP verification is best-effort and is reported as `UNVERIFIED` when the VPS/container cannot resolve or reach the public hostname.
 
 
+## v3.6.3
+
+Follow-up to the same-origin login fix: the page now uses
+`Referrer-Policy: same-origin` (instead of `no-referrer`), so the browser
+computes `Sec-Fetch-Site: same-origin` for the login form post — the old
+`no-referrer` policy stripped the referrer the browser needs, so our own
+form posts reported as `none` and were rejected. The no-`Origin` fallback
+also accepts `Sec-Fetch-Site: none` (still safe: a cross-site browser
+request always carries a real, invalid `Origin` and is rejected first, and
+`Origin: null` from opaque origins such as sandboxed iframes is explicitly
+rejected rather than treated as "missing"). Rejected same-origin checks
+now log, and return a `detail` field showing exactly which headers were
+seen, so a failure is self-diagnosing.
+
 ## v3.6.2
 
 Login now works when the browser submits the form without a usable `Origin`

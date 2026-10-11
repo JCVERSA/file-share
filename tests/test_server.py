@@ -501,6 +501,37 @@ class FileShareTests(unittest.TestCase):
         self.assertEqual(status, 303)
         self.assertIn("fs_session=", cookie)
 
+    def test_login_fetch_site_none_is_accepted(self) -> None:
+        # "none" is what a browser reports for our own document's form post
+        # when the document's referrer policy strips the referrer used to
+        # compute Sec-Fetch-Site.
+        body = urlencode({"password": self.share.state.password}).encode()
+        status, cookie = self.raw_login(
+            self.share.config.port,
+            body,
+            {"Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "none"},
+        )
+        self.assertEqual(status, 303)
+        self.assertIn("fs_session=", cookie)
+
+    def test_login_origin_null_is_rejected(self) -> None:
+        # An opaque origin (sandboxed iframe, file://) sends the literal
+        # string "null"; it must not be treated as "no Origin".
+        body = urlencode({"password": self.share.state.password}).encode()
+        status, _ = self.raw_login(
+            self.share.config.port,
+            body,
+            {"Content-Type": "application/x-www-form-urlencoded", "Origin": "null"},
+        )
+        self.assertEqual(status, 403)
+
+    def test_page_uses_same_origin_referrer_policy(self) -> None:
+        # The page must keep enough referrer context for browsers to compute
+        # Sec-Fetch-Site: same-origin on its own form posts, without leaking
+        # the URL cross-site.
+        page = self.share.open("/")
+        self.assertEqual(page.getheader("Referrer-Policy"), "same-origin")
+
     def test_public_url_verification_retries_transient_errors(self) -> None:
         good = mock.Mock()
         good.status = 200

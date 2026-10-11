@@ -43,7 +43,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urlparse
 from urllib.request import Request, urlopen
 
-APP_VERSION = "3.6.2"
+APP_VERSION = "3.6.3"
 TEMPLATE_PATH = Path(__file__).resolve().parent / "templates" / "index.html"
 QR_SCRIPT_PATH = Path(__file__).resolve().parent / "static" / "qrcode-generator.js"
 SESSION_COOKIE = "fs_session"
@@ -649,7 +649,7 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
             f"frame-ancestors {frame_ancestors}; base-uri 'none'; object-src 'none'"
         )
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Referrer-Policy", "same-origin")
         if not extra_origins:
             self.send_header("X-Frame-Options", "DENY")
         self.send_header("Content-Security-Policy", csp)
@@ -749,29 +749,46 @@ class ShareHandler(http.server.BaseHTTPRequestHandler):
     def require_same_origin(self) -> bool:
         raw_origin = self.headers.get("Origin", "")
         if raw_origin:
-            # Browser form posts always carry Origin. An invalid one is an
-            # explicit cross-site request and must be rejected outright.
+            # Browser form posts always carry Origin. An invalid one — an
+            # attacker page, or the literal string "null" from an opaque
+            # origin such as a sandboxed iframe — is rejected outright.
             if self.request_origin_is_valid():
                 return True
-            self.send_json({"error": "same-origin request required"}, status=403)
+            self._reject_same_origin()
             return False
         # No Origin: some browsers omit it on top-level form navigations and
         # privacy tooling may strip it. Sec-Fetch-Site is browser-attested and
-        # cannot be set or removed by web content, so same-origin fetch
-        # metadata is accepted; an explicit cross-site value is rejected.
+        # cannot be set by web content. "same-origin" is a direct match;
+        # "none" is what a browser reports for our own document's form post
+        # when the document's referrer policy strips the referrer used to
+        # compute the site. A cross-site browser request always carries a
+        # real (invalid) Origin and is already rejected above.
         fetch_site = self.headers.get("Sec-Fetch-Site", "").strip().lower()
-        if fetch_site == "same-origin":
+        if fetch_site in {"same-origin", "none"}:
             return True
         if fetch_site:
-            self.send_json({"error": "same-origin request required"}, status=403)
+            self._reject_same_origin()
             return False
         # A request with no Origin and no fetch metadata is not a browser
         # submission; a raw client has no browser victim to protect, so a
         # direct local peer serving one of our own hosts is accepted.
         if self._direct_local_peer():
             return True
-        self.send_json({"error": "same-origin request required"}, status=403)
+        self._reject_same_origin()
         return False
+
+    def _reject_same_origin(self) -> None:
+        """Log the failure and report exactly which headers were seen."""
+        origin = self.headers.get("Origin", "") or "missing"
+        fetch_site = self.headers.get("Sec-Fetch-Site", "") or "missing"
+        host = self.headers.get("Host", "") or "missing"
+        try:
+            peer = self.client_address[0]
+        except (IndexError, TypeError, OSError):
+            peer = "unknown"
+        detail = f"origin={origin}; sec-fetch-site={fetch_site}; host={host}; peer={peer}"
+        self.log_error("same-origin check failed: %s", detail)
+        self.send_json({"error": "same-origin request required", "detail": detail}, status=403)
 
     def _direct_local_peer(self) -> bool:
         """True for a direct loopback peer whose Host header is one we serve."""
