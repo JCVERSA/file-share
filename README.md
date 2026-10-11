@@ -38,22 +38,17 @@ Lightweight temporary file-sharing server for Linux VPS/container environments.
 
 ### Linux
 
-Install or update File Share:
-
-```bash
-curl -fsSL "https://raw.githubusercontent.com/JCVERSA/file-share/main/install.sh" | sh
-```
-
-To install a specific branch, fetch the installer from that branch — the
-installer installs and updates from the branch it was fetched from:
+Install or update File Share (primary branch: `arena/fe0ef9e9-file-share`):
 
 ```bash
 curl -fsSL "https://raw.githubusercontent.com/JCVERSA/file-share/arena/fe0ef9e9-file-share/install.sh" | sh
 ```
 
-The branch can also be overridden without changing the installer URL:
+The installer installs and updates from the branch it was fetched from; the
+branch can also be overridden without changing the installer URL:
 `... | sh -s -- --branch NAME` (or `FILE_SHARE_BRANCH=NAME ... | sh`) on Linux,
-and `-Branch NAME` (or `$env:FILE_SHARE_BRANCH`) on Windows.
+and `-Branch NAME` (or `$env:FILE_SHARE_BRANCH`) on Windows. The legacy
+`main` branch still serves the v3.6.0 installer.
 
 Then simply run:
 
@@ -89,10 +84,10 @@ fs uninstall
 
 ### Windows PowerShell
 
-Install or update File Share:
+Install or update File Share (primary branch: `arena/fe0ef9e9-file-share`):
 
 ```powershell
-irm https://raw.githubusercontent.com/JCVERSA/file-share/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/JCVERSA/file-share/arena/fe0ef9e9-file-share/install.ps1 | iex
 ```
 
 After installation, reopen PowerShell if `fs` is not immediately available:
